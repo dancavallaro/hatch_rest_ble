@@ -5,7 +5,8 @@
  * updated by chegewara
  */
 
-#include "BLEDevice.h"
+#include <Arduino.h>
+#include <BLEDevice.h>
 //#include "BLEScan.h"
 
 // The device we want to connect to.
