@@ -9,6 +9,10 @@
 #include <BLEDevice.h>
 //#include "BLEScan.h"
 
+#define BUTTON_BUILTIN 0
+
+unsigned int lastButtonState = 1;
+
 // The device we want to connect to.
 static BLEAddress deviceAddress("ef:d8:7b:5c:59:92");
 // The remote service we wish to connect to.
@@ -134,11 +138,25 @@ void setup() {
   pBLEScan->setWindow(449);
   pBLEScan->setActiveScan(true);
   pBLEScan->start(5, false);
+
+  pinMode(BUTTON_BUILTIN, INPUT);
 } // End of setup.
 
 
 // This is the Arduino main loop function.
 void loop() {
+  bool togglePower = false;
+  unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
+
+  if (buttonState != lastButtonState) {
+    lastButtonState = buttonState;
+
+    // The button is active low, and I want to change the mode when the button is
+    // released, so we'll change the mode when the button state comes back high.
+    if (buttonState == 1) {
+      togglePower = true;
+    }
+  }
 
   // If the flag "doConnect" is true then we have scanned for and found the desired
   // BLE Server with which we wish to connect.  Now we connect to it.  Once we are 
@@ -152,13 +170,7 @@ void loop() {
     doConnect = false;
   }
 
-  // If we are connected to a peer BLE Server, update the characteristic each time we are reached
-  // with the current time since boot.
-  if (connected) {
-    //String newValue = "Time since boot: " + String(millis()/1000);
-    //Serial.println("Setting new characteristic value to \"" + newValue + "\"");
-    // Set the characteristic's value to be the array of bytes that is actually a string.
-    //pRemoteCharacteristic->writeValue(newValue.c_str(), newValue.length());
+  if (connected && togglePower) {
     if (deviceOn) {
       // If it's on, turn it off
       Serial.println("Turning Hatch Rest off...");
@@ -170,9 +182,9 @@ void loop() {
     }
 
     deviceOn = !deviceOn;
-  }else if(doScan){
+  } else if (!connected && doScan){
     BLEDevice::getScan()->start(0);  // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
   }
   
-  delay(5000);
+  //delay(5000);
 } // End of loop
