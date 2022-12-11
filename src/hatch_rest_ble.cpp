@@ -13,6 +13,10 @@
 
 unsigned int lastButtonState = 1;
 
+unsigned int ledState = 0;
+const long ledBlinkDurationMillis = 100;
+unsigned long ledLastBlinkTimeMillis = 0;
+
 // The device we want to connect to.
 static BLEAddress deviceAddress("ef:d8:7b:5c:59:92");
 // The remote service we wish to connect to.
@@ -140,7 +144,8 @@ void setup() {
   pBLEScan->start(5, false);
 
   pinMode(BUTTON_BUILTIN, INPUT);
-} // End of setup.
+  pinMode(LED_BUILTIN, OUTPUT);
+}
 
 
 // This is the Arduino main loop function.
@@ -156,6 +161,16 @@ void loop() {
     if (buttonState == 1) {
       togglePower = true;
     }
+  }
+
+  unsigned long currentTimeMillis = millis();
+
+  // TODO: only do this while still scanning
+  // TODO: switch to steady on once connected
+  if (currentTimeMillis - ledLastBlinkTimeMillis > ledBlinkDurationMillis) {
+    ledState = 1 - ledState;
+    digitalWrite(LED_BUILTIN, ledState);
+    ledLastBlinkTimeMillis = currentTimeMillis;
   }
 
   // If the flag "doConnect" is true then we have scanned for and found the desired
