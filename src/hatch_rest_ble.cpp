@@ -1,7 +1,11 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
+#include <WiFi.h>
 
 #define BUTTON_BUILTIN 0
+
+#define WIFI_SSID "dtcnet"
+#define WIFI_PASSWORD "danandlauren"
 
 static std::string POWER_OFF = "SI00";
 static std::string POWER_ON = "SI01";
@@ -40,6 +44,19 @@ class HatchRestClientCallbacks : public BLEClientCallbacks {
     disconnected("via callback");
   }
 };
+
+void connectWifi() {
+  Serial.printf("Connecting to wifi network %s...\r\n", WIFI_SSID);
+
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting...");
+  }
+
+  Serial.printf("Connected to wifi with IP address: %s\r\n", WiFi.localIP().toString());
+}
 
 void connectToHatchRest() {
   client = BLEDevice::createClient();
@@ -84,6 +101,8 @@ void setup() {
   digitalWrite(LED_BUILTIN, 0);
 
   BLEDevice::init("HatchRestClient");
+
+  connectWifi();
 }
 
 void loop() {
