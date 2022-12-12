@@ -11,6 +11,7 @@ unsigned long ledLastBlinkTimeMillis = 0;
 
 // The device we want to connect to.
 static BLEAddress deviceAddress("ef:d8:7b:5c:59:92");
+static esp_ble_addr_type_t addressType = BLE_ADDR_TYPE_RANDOM;
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
 // The characteristic of the remote service we are interested in.
@@ -164,12 +165,13 @@ void loop() {
     // TODO: refactor this code into a separate method
     BLEClient* client = BLEDevice::createClient();
 
-    if (!client->connect(deviceAddress)) {
+    if (!client->connect(deviceAddress, addressType)) {
       // TODO: do something here so that we'll try again in a bit
       Serial.println("Failed to connect to device!");
     } else if (client->isConnected()) {
       // TODO: do stuff here
       Serial.println("Connected to device!");
+      connected = true;
     } else {
       // TODO: do something here too
       Serial.println("Connection appeared to be successful but now we're disconnected");
