@@ -5,10 +5,6 @@
 
 unsigned int lastButtonState = 1;
 
-unsigned int ledState = 0;
-const long ledBlinkDurationMillis = 100;
-unsigned long ledLastBlinkTimeMillis = 0;
-
 // The device we want to connect to.
 static BLEAddress deviceAddress("ef:d8:7b:5c:59:92");
 static esp_ble_addr_type_t addressType = BLE_ADDR_TYPE_RANDOM;
@@ -105,6 +101,7 @@ void setup() {
 
   pinMode(BUTTON_BUILTIN, INPUT);
   pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, 0);
 
   BLEDevice::init("HatchRestClient");
 }
@@ -123,16 +120,6 @@ void loop() {
     if (buttonState == 1) {
       togglePower = true;
     }
-  }
-
-  unsigned long currentTimeMillis = millis();
-
-  // TODO: only do this while still scanning
-  // TODO: switch to steady on once connected
-  if (currentTimeMillis - ledLastBlinkTimeMillis > ledBlinkDurationMillis) {
-    ledState = 1 - ledState;
-    digitalWrite(LED_BUILTIN, ledState);
-    ledLastBlinkTimeMillis = currentTimeMillis;
   }
 
   // If the flag "doConnect" is true then we have scanned for and found the desired
@@ -172,6 +159,7 @@ void loop() {
       // TODO: do stuff here
       Serial.println("Connected to device!");
       connected = true;
+      digitalWrite(LED_BUILTIN, 1);
     } else {
       // TODO: do something here too
       Serial.println("Connection appeared to be successful but now we're disconnected");
