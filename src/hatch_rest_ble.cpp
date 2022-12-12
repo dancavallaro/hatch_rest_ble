@@ -1,13 +1,5 @@
-/**
- * A BLE client example that is rich in capabilities.
- * There is a lot new capabilities implemented.
- * author unknown
- * updated by chegewara
- */
-
 #include <Arduino.h>
 #include <BLEDevice.h>
-//#include "BLEScan.h"
 
 #define BUTTON_BUILTIN 0
 
@@ -34,19 +26,6 @@ static boolean doScan = false;
 static BLERemoteCharacteristic* pRemoteCharacteristic;
 static BLEAdvertisedDevice* myDevice;
 
-static void notifyCallback(
-  BLERemoteCharacteristic* pBLERemoteCharacteristic,
-  uint8_t* pData,
-  size_t length,
-  bool isNotify) {
-    Serial.print("Notify callback for characteristic ");
-    Serial.print(pBLERemoteCharacteristic->getUUID().toString().c_str());
-    Serial.print(" of data length ");
-    Serial.println(length);
-    Serial.print("data: ");
-    Serial.println((char*)pData);
-}
-
 class MyClientCallback : public BLEClientCallbacks {
   void onConnect(BLEClient* pclient) {
   }
@@ -66,7 +45,7 @@ bool connectToServer() {
 
     pClient->setClientCallbacks(new MyClientCallback());
 
-    // Connect to the remove BLE Server.
+    // Connect to the remote BLE Server.
     pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
     Serial.println(" - Connected to server");
     pClient->setMTU(517); //set client to request maximum MTU from server (default is 23 otherwise)
@@ -92,19 +71,10 @@ bool connectToServer() {
     }
     Serial.println(" - Found our characteristic");
 
-    // Read the value of the characteristic.
-    //if(pRemoteCharacteristic->canRead()) {
-    //  std::string value = pRemoteCharacteristic->readValue();
-    //  Serial.print("The characteristic value was: ");
-    //  Serial.println(value.c_str());
-    //}
-
-    //if(pRemoteCharacteristic->canNotify())
-    //  pRemoteCharacteristic->registerForNotify(notifyCallback);
-
     connected = true;
     return true;
 }
+
 /**
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
  */
@@ -123,14 +93,18 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
       doConnect = true;
       doScan = true;
 
-    } // Found our server
-  } // onResult
-}; // MyAdvertisedDeviceCallbacks
+    }
+  }
+};
 
 
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting Arduino BLE Client application...");
+
+  pinMode(BUTTON_BUILTIN, INPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
+
   BLEDevice::init("");
 
   // Retrieve a Scanner and set the callback we want to use to be informed when we
@@ -142,9 +116,6 @@ void setup() {
   pBLEScan->setWindow(449);
   pBLEScan->setActiveScan(true);
   pBLEScan->start(5, false);
-
-  pinMode(BUTTON_BUILTIN, INPUT);
-  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 
@@ -202,6 +173,4 @@ void loop() {
   } else if (!connected && doScan){
     BLEDevice::getScan()->start(0);  // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
   }
-  
-  //delay(5000);
-} // End of loop
+}
