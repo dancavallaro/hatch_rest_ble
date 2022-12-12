@@ -105,17 +105,7 @@ void setup() {
   pinMode(BUTTON_BUILTIN, INPUT);
   pinMode(LED_BUILTIN, OUTPUT);
 
-  BLEDevice::init("");
-
-  // Retrieve a Scanner and set the callback we want to use to be informed when we
-  // have detected a new device.  Specify that we want active scanning and start the
-  // scan to run for 5 seconds.
-  BLEScan* pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setInterval(1349);
-  pBLEScan->setWindow(449);
-  pBLEScan->setActiveScan(true);
-  pBLEScan->start(5, false);
+  BLEDevice::init("HatchRestClient");
 }
 
 
@@ -170,7 +160,19 @@ void loop() {
     }
 
     deviceOn = !deviceOn;
-  } else if (!connected && doScan){
-    BLEDevice::getScan()->start(0);  // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
+  } else if (!connected) {
+    // TODO: refactor this code into a separate method
+    BLEClient* client = BLEDevice::createClient();
+
+    if (!client->connect(deviceAddress)) {
+      // TODO: do something here so that we'll try again in a bit
+      Serial.println("Failed to connect to device!");
+    } else if (client->isConnected()) {
+      // TODO: do stuff here
+      Serial.println("Connected to device!");
+    } else {
+      // TODO: do something here too
+      Serial.println("Connection appeared to be successful but now we're disconnected");
+    }
   }
 }
