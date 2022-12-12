@@ -110,14 +110,12 @@ void loop() {
     } else if (togglePower) {
       if (deviceOn) {
         // If it's on, turn it off
-        Serial.println("(NOT!) Turning Hatch Rest off...");
-        // TODO: uncomment
-        //remoteCharacteristic->writeValue(POWER_OFF.c_str(), POWER_OFF.length());
+        Serial.println("Turning Hatch Rest off...");
+        remoteCharacteristic->writeValue(POWER_OFF.c_str(), POWER_OFF.length());
       } else {
         // If it's off, turn it on
-        Serial.println("(NOT!) Turning Hatch Rest on...");
-        // TODO: uncomment
-        //remoteCharacteristic->writeValue(POWER_ON.c_str(), POWER_ON.length());
+        Serial.println("Turning Hatch Rest on...");
+        remoteCharacteristic->writeValue(POWER_ON.c_str(), POWER_ON.length());
       }
 
       deviceOn = !deviceOn;
