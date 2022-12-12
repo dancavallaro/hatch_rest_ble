@@ -72,32 +72,8 @@ bool connectToServer() {
     return true;
 }
 
-/**
- * Scan for BLE servers and find the first one that advertises the service we are looking for.
- */
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
- /**
-   * Called for each advertising BLE server.
-   */
-  void onResult(BLEAdvertisedDevice advertisedDevice) {
-    Serial.print("BLE Advertised Device found: ");
-    Serial.println(advertisedDevice.toString().c_str());
-
-    if (advertisedDevice.getAddress().equals(deviceAddress)) {
-      Serial.println("Found device with the expected MAC address!");
-      BLEDevice::getScan()->stop();
-      myDevice = new BLEAdvertisedDevice(advertisedDevice);
-      doConnect = true;
-      doScan = true;
-
-    }
-  }
-};
-
-
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting Arduino BLE Client application...");
 
   pinMode(BUTTON_BUILTIN, INPUT);
   pinMode(LED_BUILTIN, OUTPUT);
@@ -106,8 +82,6 @@ void setup() {
   BLEDevice::init("HatchRestClient");
 }
 
-
-// This is the Arduino main loop function.
 void loop() {
   bool togglePower = false;
   unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
