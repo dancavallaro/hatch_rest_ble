@@ -3,6 +3,9 @@
 
 #define BUTTON_BUILTIN 0
 
+static String POWER_OFF = "SI00";
+static String POWER_ON = "SI01";
+
 unsigned int lastButtonState = 1;
 
 // The device we want to connect to.
@@ -13,63 +16,68 @@ static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
 // The characteristic of the remote service we are interested in.
 static BLEUUID    charUUID("02240002-5efd-47eb-9c1a-de53f7a2b232");
 
-static String POWER_OFF = "SI00";
-static String POWER_ON = "SI01";
-
-static boolean doConnect = false;
+static BLEClient* client = nullptr;
 static boolean connected = false;
+// TODO: can i read the current state of this? 
+// TODO: er, i guess this just goes away when i integrate with alexa, don't need the button
 static boolean deviceOn = false;
-static boolean doScan = false;
-static BLERemoteCharacteristic* pRemoteCharacteristic;
-static BLEAdvertisedDevice* myDevice;
+static BLERemoteCharacteristic* remoteCharacteristic;
 
-class MyClientCallback : public BLEClientCallbacks {
-  void onConnect(BLEClient* pclient) {
-  }
+const unsigned int connectionAttemptInterval = 5000;
+unsigned long lastConnectionAttempt = -1;
 
-  void onDisconnect(BLEClient* pclient) {
-    connected = false;
-    Serial.println("onDisconnect");
+void disconnected(String message) {
+  Serial.printf("Connection to Hatch Rest lost! (%s)\r\n", message);
+  digitalWrite(LED_BUILTIN, 0);
+  connected = false;
+}
+
+class HatchRestClientCallbacks : public BLEClientCallbacks {
+  // We don't use this callback but it needs to be defined
+  void onConnect(BLEClient* client) { }
+
+  void onDisconnect(BLEClient* client) {
+    disconnected("via callback");
   }
 };
 
-bool connectToServer() {
-    Serial.print("Forming a connection to ");
-    Serial.println(myDevice->getAddress().toString().c_str());
-    
-    BLEClient*  pClient  = BLEDevice::createClient();
-    Serial.println(" - Created client");
+void connectToHatchRest() {
+  if (client != nullptr) {
+    delete client;
+  }
 
-    pClient->setClientCallbacks(new MyClientCallback());
+  client = BLEDevice::createClient();
+  Serial.println("Attempting to connect to Hatch Rest...");
 
-    // Connect to the remote BLE Server.
-    pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
-    Serial.println(" - Connected to server");
-    pClient->setMTU(517); //set client to request maximum MTU from server (default is 23 otherwise)
-  
-    // Obtain a reference to the service we are after in the remote BLE server.
-    BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
-    if (pRemoteService == nullptr) {
-      Serial.print("Failed to find our service UUID: ");
-      Serial.println(serviceUUID.toString().c_str());
-      pClient->disconnect();
-      return false;
-    }
-    Serial.println(" - Found our service");
+  if (!client->connect(deviceAddress, addressType)) {
+    Serial.println("Failed to connect to device!");
+    return;
+  } else if (!client->isConnected()) {
+    Serial.println("Connection appeared to be successful but now we're disconnected");
+    return;
+  } else {
+    Serial.println("Connected to device!");
+  }
 
+  BLERemoteService* remoteService = client->getService(serviceUUID);
+  if (remoteService == nullptr) {
+    Serial.println("Failed to find our service UUID");
+    client->disconnect();
+    return;
+  }
+  Serial.println(" - Found our service");
 
-    // Obtain a reference to the characteristic in the service of the remote BLE server.
-    pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
-    if (pRemoteCharacteristic == nullptr) {
-      Serial.print("Failed to find our characteristic UUID: ");
-      Serial.println(charUUID.toString().c_str());
-      pClient->disconnect();
-      return false;
-    }
-    Serial.println(" - Found our characteristic");
+  remoteCharacteristic = remoteService->getCharacteristic(charUUID);
+  if (remoteCharacteristic == nullptr) {
+    Serial.println("Failed to find our characteristic UUID");
+    client->disconnect();
+    return;
+  }
+  Serial.println(" - Found our characteristic");
 
-    connected = true;
-    return true;
+  Serial.println("Ready to control device!");
+  connected = true;
+  digitalWrite(LED_BUILTIN, 1);
 }
 
 void setup() {
@@ -89,54 +97,38 @@ void loop() {
   if (buttonState != lastButtonState) {
     lastButtonState = buttonState;
 
-    // The button is active low, and I want to change the mode when the button is
+    // The button is active low, and I want to toggle power when the button is
     // released, so we'll change the mode when the button state comes back high.
     if (buttonState == 1) {
       togglePower = true;
     }
   }
 
-  // If the flag "doConnect" is true then we have scanned for and found the desired
-  // BLE Server with which we wish to connect.  Now we connect to it.  Once we are 
-  // connected we set the connected flag to be true.
-  if (doConnect == true) {
-    if (connectToServer()) {
-      Serial.println("We are now connected to the BLE Server.");
-    } else {
-      Serial.println("We have failed to connect to the server; there is nothin more we will do.");
+  if (connected) {
+    if (!client->isConnected()) {
+      disconnected("via detection");
+    } else if (togglePower) {
+      if (deviceOn) {
+        // If it's on, turn it off
+        Serial.println("(NOT!) Turning Hatch Rest off...");
+        // TODO: uncomment
+        //remoteCharacteristic->writeValue(POWER_OFF.c_str(), POWER_OFF.length());
+      } else {
+        // If it's off, turn it on
+        Serial.println("(NOT!) Turning Hatch Rest on...");
+        // TODO: uncomment
+        //remoteCharacteristic->writeValue(POWER_ON.c_str(), POWER_ON.length());
+      }
+
+      deviceOn = !deviceOn;
     }
-    doConnect = false;
-  }
+  } else {
+    unsigned long currentTimeMillis = millis();
 
-  if (connected && togglePower) {
-    if (deviceOn) {
-      // If it's on, turn it off
-      Serial.println("(NOT!) Turning Hatch Rest off...");
-      // TODO: uncomment
-      //pRemoteCharacteristic->writeValue(POWER_OFF.c_str(), POWER_OFF.length());
-    } else {
-      // If it's off, turn it on
-      Serial.println("(NOT!) Turning Hatch Rest on...");
-      // TODO: uncomment
-      //pRemoteCharacteristic->writeValue(POWER_ON.c_str(), POWER_ON.length());
-    }
-
-    deviceOn = !deviceOn;
-  } else if (!connected) {
-    // TODO: refactor this code into a separate method
-    BLEClient* client = BLEDevice::createClient();
-
-    if (!client->connect(deviceAddress, addressType)) {
-      // TODO: do something here so that we'll try again in a bit
-      Serial.println("Failed to connect to device!");
-    } else if (client->isConnected()) {
-      // TODO: do stuff here
-      Serial.println("Connected to device!");
-      connected = true;
-      digitalWrite(LED_BUILTIN, 1);
-    } else {
-      // TODO: do something here too
-      Serial.println("Connection appeared to be successful but now we're disconnected");
+    if (lastConnectionAttempt == -1 || 
+        currentTimeMillis - lastConnectionAttempt > connectionAttemptInterval) {
+      lastConnectionAttempt = currentTimeMillis;
+      connectToHatchRest();
     }
   }
 }
