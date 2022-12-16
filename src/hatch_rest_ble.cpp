@@ -3,8 +3,9 @@
 
 #define BUTTON_BUILTIN 0
 
-static String POWER_OFF = "SI00";
-static String POWER_ON = "SI01";
+static std::string POWER_OFF = "SI00";
+static std::string POWER_ON = "SI01";
+static std::string SET_FAVORITE = "SP02";
 
 unsigned int lastButtonState = 1;
 
@@ -111,11 +112,22 @@ void loop() {
       if (deviceOn) {
         // If it's on, turn it off
         Serial.println("Turning Hatch Rest off...");
-        remoteCharacteristic->writeValue(POWER_OFF.c_str(), POWER_OFF.length());
+        remoteCharacteristic->writeValue(POWER_OFF);
       } else {
         // If it's off, turn it on
         Serial.println("Turning Hatch Rest on...");
-        remoteCharacteristic->writeValue(POWER_ON.c_str(), POWER_ON.length());
+        // When we tap the touch ring on the device to turn it on and off, it doesn't
+        // *actually* cycle the power, it's really just cycling through the presets.
+        // one preset is the ocean sound, and the other preset has 0 volume and changes
+        // the track to "none". This means that if the device was last turned off by
+        // physically touching the ring, simply sending a power on command won't start
+        // playing sound, since it's still set to the no-sound preset. So when turning
+        // it on we send the "set favorite" command to make sure that the right track is
+        // playing, regardless of how it was last turned off. Note that when turning 
+        // it off we *can* simply send the power off command, and that'll work regardless
+        // of how it was turned on.
+        remoteCharacteristic->writeValue(SET_FAVORITE);
+        remoteCharacteristic->writeValue(POWER_ON);
       }
 
       deviceOn = !deviceOn;
