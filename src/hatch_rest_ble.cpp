@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <BLEDevice.h>
+#include <NimBLEDevice.h>
 
 #define BUTTON_BUILTIN 0
 
@@ -10,8 +10,7 @@ static std::string SET_FAVORITE = "SP02";
 unsigned int lastButtonState = 1;
 
 // The device we want to connect to.
-static BLEAddress deviceAddress("ef:d8:7b:5c:59:92");
-static esp_ble_addr_type_t addressType = BLE_ADDR_TYPE_RANDOM;
+static BLEAddress deviceAddress("ef:d8:7b:5c:59:92", 1);
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
 // The characteristic of the remote service we are interested in.
@@ -43,14 +42,10 @@ class HatchRestClientCallbacks : public BLEClientCallbacks {
 };
 
 void connectToHatchRest() {
-  if (client != nullptr) {
-    delete client;
-  }
-
   client = BLEDevice::createClient();
   Serial.println("Attempting to connect to Hatch Rest...");
 
-  if (!client->connect(deviceAddress, addressType)) {
+  if (!client->connect(deviceAddress)) {
     Serial.println("Failed to connect to device!");
     return;
   } else if (!client->isConnected()) {
