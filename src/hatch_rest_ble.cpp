@@ -8,22 +8,20 @@
 #define WIFI_SSID "dtcnet"
 #define WIFI_PASSWORD "danandlauren"
 
-#define ALEXA_DEVICE "hatch"
+#define ALEXA_DEVICE_NAME "hatch"
 
+// Identifiers for connecting to the Hatch over BLE
+static BLEAddress deviceAddress("ef:d8:7b:5c:59:92", 1);
+static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
+static BLEUUID    charUUID("02240002-5efd-47eb-9c1a-de53f7a2b232");
+
+// Commands for controlling the Hatch over BLE
 static std::string POWER_OFF = "SI00";
 static std::string POWER_ON = "SI01";
 static std::string SET_FAVORITE = "SP02";
 
 unsigned int lastButtonState = 1;
 
-// The device we want to connect to.
-static BLEAddress deviceAddress("ef:d8:7b:5c:59:92", 1);
-// The remote service we wish to connect to.
-static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
-// The characteristic of the remote service we are interested in.
-static BLEUUID    charUUID("02240002-5efd-47eb-9c1a-de53f7a2b232");
-
-static BLEClient* client = nullptr;
 static boolean connected = false;
 // TODO: can i read the current state of this? 
 // TODO: er, i guess this just goes away when i integrate with alexa, don't need the button
@@ -42,12 +40,12 @@ void disconnected(String message) {
 }
 
 class HatchRestClientCallbacks : public BLEClientCallbacks {
-  // We don't use this callback but it needs to be defined
-  void onConnect(BLEClient* client) { }
-
   void onDisconnect(BLEClient* client) {
     disconnected("via callback");
   }
+
+  // We don't use this callback but it needs to be defined
+  void onConnect(BLEClient* client) { }
 };
 
 void connectWifi() {
@@ -64,7 +62,7 @@ void connectWifi() {
 }
 
 void connectToHatchRest() {
-  client = BLEDevice::createClient();
+  NimBLEClient* client = BLEDevice::createClient();
   Serial.println("Attempting to connect to Hatch Rest...");
 
   if (!client->connect(deviceAddress)) {
@@ -122,12 +120,12 @@ void setDeviceState(bool state) {
 void setupAlexaDevice() {
   Serial.println("Setting up Alexa device");
 
-  fauxmo.addDevice(ALEXA_DEVICE);
+  fauxmo.addDevice(ALEXA_DEVICE_NAME);
   fauxmo.setPort(80);
   fauxmo.enable(true);
 
   fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
-    if (strcmp(device_name, ALEXA_DEVICE) == 0) {
+    if (strcmp(device_name, ALEXA_DEVICE_NAME) == 0) {
       Serial.printf("Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
       // TODO: don't do this in the callback, just set a variable or something and do this in loop()
       setDeviceState(state);
@@ -170,7 +168,7 @@ void loop() {
   }
 
   if (connected) {
-    if (!client->isConnected()) {
+    if (!remoteCharacteristic->getRemoteService()->getClient()->isConnected()) {
       disconnected("via detection");
     } else if (togglePower) {
       setDeviceState(deviceOn);
