@@ -21,6 +21,9 @@ static std::string POWER_ON = "SI01";
 static std::string SET_FAVORITE = "SP02";
 
 unsigned int lastButtonState = 1;
+unsigned long buttonPressStartTime = -1;
+const unsigned int shortPressMillis = 1000;
+const unsigned int longHoldMillis = 2000;
 
 bool changeDeviceState = false;
 bool newDeviceState = false;
@@ -156,17 +159,29 @@ void loop() {
   fauxmo.handle();
 
   unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
+  const unsigned int currentMillis = millis();
 
-  // TODO: press once to turn on, press and hold for 2 seconds to turn off
   if (buttonState != lastButtonState) {
     lastButtonState = buttonState;
 
-    // The button is active low, and I want to toggle power when the button is
-    // released, so we'll change the mode when the button state comes back high.
-    if (buttonState == 1) {
-      // TODO: do short vs. long press to determine new state here
-      setDeviceState(true);
+    if (buttonState == 0) {
+      // The button is active low, so this is the beginning of a press/hold.
+      buttonPressStartTime = currentMillis;
+    } else if (buttonState == 1) {
+      // If the button was released within the threshold, turn on the device.
+      if (currentMillis - buttonPressStartTime < shortPressMillis) {
+        setDeviceState(true);
+      }
+
+      buttonPressStartTime = -1;
     }
+  }
+
+  if (buttonPressStartTime != -1 && 
+      currentMillis - buttonPressStartTime > longHoldMillis) {
+    setDeviceState(false);
+    // Consider the button press over once it's triggered a long hold.
+    buttonPressStartTime = -1;
   }
 
   if (connected) {
