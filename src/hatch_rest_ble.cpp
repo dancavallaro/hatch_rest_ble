@@ -126,6 +126,7 @@ void setupAlexaDevice() {
 
   fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
     Serial.printf("Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
+    // TODO: don't do this in the callback, just set a variable or something and do this in loop()
     setDeviceState(state);
   });
 
@@ -152,6 +153,8 @@ void loop() {
   unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
 
   // TODO: get rid of all the button stuff now that i have Alexa working
+  // TODO: or maybe do, press once to turn on, press and hold for 2 seconds
+  // to turn off. That would eliminate the state drift.
   if (buttonState != lastButtonState) {
     lastButtonState = buttonState;
 
