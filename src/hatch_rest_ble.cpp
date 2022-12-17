@@ -8,6 +8,8 @@
 #define WIFI_SSID "dtcnet"
 #define WIFI_PASSWORD "danandlauren"
 
+#define ALEXA_DEVICE "hatch"
+
 static std::string POWER_OFF = "SI00";
 static std::string POWER_ON = "SI01";
 static std::string SET_FAVORITE = "SP02";
@@ -120,14 +122,16 @@ void setDeviceState(bool state) {
 void setupAlexaDevice() {
   Serial.println("Setting up Alexa device");
 
-  fauxmo.addDevice("hatch");
+  fauxmo.addDevice(ALEXA_DEVICE);
   fauxmo.setPort(80);
   fauxmo.enable(true);
 
   fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
-    Serial.printf("Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
-    // TODO: don't do this in the callback, just set a variable or something and do this in loop()
-    setDeviceState(state);
+    if (strcmp(device_name, ALEXA_DEVICE) == 0) {
+      Serial.printf("Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
+      // TODO: don't do this in the callback, just set a variable or something and do this in loop()
+      setDeviceState(state);
+    }
   });
 
   Serial.println("Done setting up Alexa device");
