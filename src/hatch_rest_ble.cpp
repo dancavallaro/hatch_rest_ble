@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <WiFi.h>
+#include <fauxmoESP.h>
 
 #define BUTTON_BUILTIN 0
 
@@ -29,6 +30,8 @@ static BLERemoteCharacteristic* remoteCharacteristic;
 
 const unsigned int connectionAttemptInterval = 5000;
 unsigned long lastConnectionAttempt = -1;
+
+fauxmoESP fauxmo;
 
 void disconnected(String message) {
   Serial.printf("Connection to Hatch Rest lost! (%s)\r\n", message);
@@ -93,6 +96,42 @@ void connectToHatchRest() {
   digitalWrite(LED_BUILTIN, 1);
 }
 
+void setDeviceState(bool state) {
+  if (state) {
+    Serial.println("Turning Hatch Rest on...");
+    // When we tap the touch ring on the device to turn it on and off, it doesn't
+    // *actually* cycle the power, it's really just cycling through the presets.
+    // one preset is the ocean sound, and the other preset has 0 volume and changes
+    // the track to "none". This means that if the device was last turned off by
+    // physically touching the ring, simply sending a power on command won't start
+    // playing sound, since it's still set to the no-sound preset. So when turning
+    // it on we send the "set favorite" command to make sure that the right track is
+    // playing, regardless of how it was last turned off. Note that when turning 
+    // it off we *can* simply send the power off command, and that'll work regardless
+    // of how it was turned on.
+    remoteCharacteristic->writeValue(SET_FAVORITE);
+    remoteCharacteristic->writeValue(POWER_ON);
+  } else {
+    Serial.println("Turning Hatch Rest off...");
+    remoteCharacteristic->writeValue(POWER_OFF);
+  }
+}
+
+void setupAlexaDevice() {
+  Serial.println("Setting up Alexa device");
+
+  fauxmo.addDevice("hatch");
+  fauxmo.setPort(80);
+  fauxmo.enable(true);
+
+  fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
+    Serial.printf("Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
+    setDeviceState(state);
+  });
+
+  Serial.println("Done setting up Alexa device");
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -103,12 +142,16 @@ void setup() {
   BLEDevice::init("HatchRestClient");
 
   connectWifi();
+  setupAlexaDevice();
 }
 
 void loop() {
+  fauxmo.handle();
+
   bool togglePower = false;
   unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
 
+  // TODO: get rid of all the button stuff now that i have Alexa working
   if (buttonState != lastButtonState) {
     lastButtonState = buttonState;
 
@@ -123,27 +166,7 @@ void loop() {
     if (!client->isConnected()) {
       disconnected("via detection");
     } else if (togglePower) {
-      if (deviceOn) {
-        // If it's on, turn it off
-        Serial.println("Turning Hatch Rest off...");
-        remoteCharacteristic->writeValue(POWER_OFF);
-      } else {
-        // If it's off, turn it on
-        Serial.println("Turning Hatch Rest on...");
-        // When we tap the touch ring on the device to turn it on and off, it doesn't
-        // *actually* cycle the power, it's really just cycling through the presets.
-        // one preset is the ocean sound, and the other preset has 0 volume and changes
-        // the track to "none". This means that if the device was last turned off by
-        // physically touching the ring, simply sending a power on command won't start
-        // playing sound, since it's still set to the no-sound preset. So when turning
-        // it on we send the "set favorite" command to make sure that the right track is
-        // playing, regardless of how it was last turned off. Note that when turning 
-        // it off we *can* simply send the power off command, and that'll work regardless
-        // of how it was turned on.
-        remoteCharacteristic->writeValue(SET_FAVORITE);
-        remoteCharacteristic->writeValue(POWER_ON);
-      }
-
+      setDeviceState(deviceOn);
       deviceOn = !deviceOn;
     }
   } else {
