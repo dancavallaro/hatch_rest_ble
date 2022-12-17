@@ -22,10 +22,10 @@ static std::string SET_FAVORITE = "SP02";
 
 unsigned int lastButtonState = 1;
 
+bool changeDeviceState = false;
+bool newDeviceState = false;
+
 static boolean connected = false;
-// TODO: can i read the current state of this? 
-// TODO: er, i guess this just goes away when i integrate with alexa, don't need the button
-static boolean deviceOn = false;
 static BLERemoteCharacteristic* remoteCharacteristic;
 
 const unsigned int connectionAttemptInterval = 5000;
@@ -97,6 +97,11 @@ void connectToHatchRest() {
 }
 
 void setDeviceState(bool state) {
+  changeDeviceState = true;
+  newDeviceState = state;
+}
+
+void setDeviceStateActually(bool state) {
   if (state) {
     Serial.println("Turning Hatch Rest on...");
     // When we tap the touch ring on the device to turn it on and off, it doesn't
@@ -127,7 +132,6 @@ void setupAlexaDevice() {
   fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
     if (strcmp(device_name, ALEXA_DEVICE_NAME) == 0) {
       Serial.printf("Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
-      // TODO: don't do this in the callback, just set a variable or something and do this in loop()
       setDeviceState(state);
     }
   });
@@ -151,28 +155,26 @@ void setup() {
 void loop() {
   fauxmo.handle();
 
-  bool togglePower = false;
   unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
 
-  // TODO: get rid of all the button stuff now that i have Alexa working
-  // TODO: or maybe do, press once to turn on, press and hold for 2 seconds
-  // to turn off. That would eliminate the state drift.
+  // TODO: press once to turn on, press and hold for 2 seconds to turn off
   if (buttonState != lastButtonState) {
     lastButtonState = buttonState;
 
     // The button is active low, and I want to toggle power when the button is
     // released, so we'll change the mode when the button state comes back high.
     if (buttonState == 1) {
-      togglePower = true;
+      // TODO: do short vs. long press to determine new state here
+      setDeviceState(true);
     }
   }
 
   if (connected) {
     if (!remoteCharacteristic->getRemoteService()->getClient()->isConnected()) {
       disconnected("via detection");
-    } else if (togglePower) {
-      setDeviceState(deviceOn);
-      deviceOn = !deviceOn;
+    } else if (changeDeviceState) {
+      setDeviceStateActually(newDeviceState);
+      changeDeviceState = false;
     }
   } else {
     unsigned long currentTimeMillis = millis();
