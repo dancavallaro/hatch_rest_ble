@@ -36,7 +36,7 @@ bool longHoldTriggered = false;
 
 static boolean connected = false;
 static boolean shouldConnect = true;
-static NimBLEClient* client;
+static NimBLEClient* client = nullptr;
 static BLERemoteCharacteristic* remoteCharacteristic;
 
 const unsigned int connectionAttemptInterval = 5000;
@@ -70,7 +70,10 @@ void connectWifi() {
 }
 
 void connectToHatchRest() {
-  client = BLEDevice::createClient();
+  if (client == nullptr) {
+    client = BLEDevice::createClient();
+  }
+
   Serial.println("Attempting to connect to Hatch Rest...");
 
   if (!client->connect(deviceAddress)) {
