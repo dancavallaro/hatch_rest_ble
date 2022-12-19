@@ -54,9 +54,6 @@ class HatchRestClientCallbacks : public BLEClientCallbacks {
   void onDisconnect(BLEClient* client) {
     disconnected("via callback");
   }
-
-  // We don't use this callback but it needs to be defined
-  void onConnect(BLEClient* client) { }
 };
 
 void connectWifi() {
