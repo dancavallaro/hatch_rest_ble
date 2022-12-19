@@ -22,22 +22,30 @@ static std::string SET_FAVORITE = "SP02";
 
 unsigned int lastButtonState = 1;
 unsigned long buttonPressStartTime = -1;
+// A short press must be shorter than this threshold and turns the device on.
 const unsigned int shortPressMillis = 1000;
+// A long hold must be longer than this threshold and turns the device off.
 const unsigned int longHoldMillis = 2000;
+// A long hold longer than this threadhold will cause the ESP32 to disconnect
+// from BLE and not reconnect until a reset.
+const unsigned int veryLongHoldMillis = 5000;
 
 bool changeDeviceState = false;
 bool newDeviceState = false;
+bool longHoldTriggered = false;
 
 static boolean connected = false;
+static boolean shouldConnect = true;
+static NimBLEClient* client;
 static BLERemoteCharacteristic* remoteCharacteristic;
 
 const unsigned int connectionAttemptInterval = 5000;
-unsigned long lastConnectionAttempt = -1;
+unsigned long lastConnectionAttempt = 0;
 
 fauxmoESP fauxmo;
 
 void disconnected(String message) {
-  Serial.printf("Connection to Hatch Rest lost! (%s)\r\n", message);
+  Serial.printf("Connection to Hatch Rest lost! (%s)\r\n", message.c_str());
   digitalWrite(LED_BUILTIN, 0);
   connected = false;
 }
@@ -65,7 +73,7 @@ void connectWifi() {
 }
 
 void connectToHatchRest() {
-  NimBLEClient* client = BLEDevice::createClient();
+  client = BLEDevice::createClient();
   Serial.println("Attempting to connect to Hatch Rest...");
 
   if (!client->connect(deviceAddress)) {
@@ -159,7 +167,7 @@ void loop() {
   fauxmo.handle();
 
   unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
-  const unsigned int currentMillis = millis();
+  const unsigned long currentMillis = millis();
 
   if (buttonState != lastButtonState) {
     lastButtonState = buttonState;
@@ -167,36 +175,50 @@ void loop() {
     if (buttonState == 0) {
       // The button is active low, so this is the beginning of a press/hold.
       buttonPressStartTime = currentMillis;
+      longHoldTriggered = false;
     } else if (buttonState == 1) {
       // If the button was released within the threshold, turn on the device.
       if (currentMillis - buttonPressStartTime < shortPressMillis) {
         setDeviceState(true);
       }
 
+      // Reset the button press timer when the button is released.
       buttonPressStartTime = -1;
     }
   }
 
-  if (buttonPressStartTime != -1 && 
-      currentMillis - buttonPressStartTime > longHoldMillis) {
-    setDeviceState(false);
-    // Consider the button press over once it's triggered a long hold.
-    buttonPressStartTime = -1;
+  if (buttonPressStartTime != -1) {
+    const unsigned long buttonPressMillis = currentMillis - buttonPressStartTime;
+
+    if (!longHoldTriggered && buttonPressMillis > longHoldMillis) {
+      setDeviceState(false);
+      longHoldTriggered = true;
+    } else if (buttonPressMillis > veryLongHoldMillis) {
+      Serial.println("Disconnecting from BLE and will not reconnect until reset");
+      client->disconnect();
+      disconnected("via manual button press");
+
+      // Never try reconnecting (until a reset).
+      shouldConnect = false;
+
+      // Only reset the button press when a very long hold is triggered.
+      // When a long hold is triggered, we want to keep the timer running
+      // in case it turns into a very long hold.
+      buttonPressStartTime = -1;
+    }
   }
 
   if (connected) {
-    if (!remoteCharacteristic->getRemoteService()->getClient()->isConnected()) {
+    if (!client->isConnected()) {
       disconnected("via detection");
     } else if (changeDeviceState) {
       setDeviceStateActually(newDeviceState);
       changeDeviceState = false;
     }
-  } else {
-    unsigned long currentTimeMillis = millis();
-
-    if (lastConnectionAttempt == -1 || 
-        currentTimeMillis - lastConnectionAttempt > connectionAttemptInterval) {
-      lastConnectionAttempt = currentTimeMillis;
+  } else if (shouldConnect) {
+    if (lastConnectionAttempt == 0 || 
+        currentMillis - lastConnectionAttempt > connectionAttemptInterval) {
+      lastConnectionAttempt = currentMillis;
       connectToHatchRest();
     }
   }
