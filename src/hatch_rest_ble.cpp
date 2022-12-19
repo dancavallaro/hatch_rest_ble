@@ -125,11 +125,11 @@ void setDeviceStateActually(bool state) {
     // playing, regardless of how it was last turned off. Note that when turning 
     // it off we *can* simply send the power off command, and that'll work regardless
     // of how it was turned on.
-    //remoteCharacteristic->writeValue(SET_FAVORITE);
-    //remoteCharacteristic->writeValue(POWER_ON);
+    remoteCharacteristic->writeValue(SET_FAVORITE);
+    remoteCharacteristic->writeValue(POWER_ON);
   } else {
     Serial.println("Turning Hatch Rest off...");
-    //remoteCharacteristic->writeValue(POWER_OFF);
+    remoteCharacteristic->writeValue(POWER_OFF);
   }
 }
 
