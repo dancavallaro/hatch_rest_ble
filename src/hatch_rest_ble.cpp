@@ -141,8 +141,9 @@ void setupAlexaDevice() {
   fauxmo.enable(true);
 
   fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
+    Serial.printf("Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
+    
     if (strcmp(device_name, ALEXA_DEVICE_NAME) == 0) {
-      Serial.printf("Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
       setDeviceState(state);
     }
   });
