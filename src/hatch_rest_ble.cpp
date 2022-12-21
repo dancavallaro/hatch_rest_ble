@@ -82,14 +82,18 @@ void connectToHatchRest() {
 
   Serial.println("Attempting to connect to Hatch Rest...");
 
-  if (!client->connect(deviceAddress)) {
-    Serial.println("Failed to connect to device!");
-    return;
-  } else if (!client->isConnected()) {
-    Serial.println("Connection appeared to be successful but now we're disconnected");
-    return;
-  } else {
-    Serial.println("Connected to device!");
+  for (;;) {
+    if (!client->connect(deviceAddress)) {
+      Serial.println("Failed to connect to device!");
+    } else if (!client->isConnected()) {
+      Serial.println("Connection appeared to be successful but now we're disconnected");
+    } else {
+      Serial.println("Connected to device!");
+      break;
+    }
+
+    // If we failed to connect or disconnected, just keep trying after a short delay.
+    delay(10);
   }
 
   BLERemoteService* remoteService = client->getService(serviceUUID);
