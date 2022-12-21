@@ -10,6 +10,12 @@
 
 #define ALEXA_DEVICE_NAME "hatch"
 
+// Unique ID to use for the Alexa device. Don't change this!
+// This ID allow Alexa to uniquely identify the device, including
+// when the name changes. This will also allow this firmware to run on
+// a different controller but appear as the same device to Alexa.
+#define ALEXA_DEVICE_UNIQUE_ID "e0:4c:a9:40:33:c2:62:03-00"
+
 // Identifiers for connecting to the Hatch over BLE
 static BLEAddress deviceAddress("ef:d8:7b:5c:59:92", 1);
 static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
@@ -136,7 +142,9 @@ void setDeviceStateActually(bool state) {
 void setupAlexaDevice() {
   Serial.println("Setting up Alexa device");
 
-  fauxmo.addDevice(ALEXA_DEVICE_NAME);
+  unsigned char deviceId = fauxmo.addDevice(ALEXA_DEVICE_NAME);
+  fauxmo.setDeviceUniqueId(deviceId, ALEXA_DEVICE_UNIQUE_ID);
+
   fauxmo.setPort(80);
   fauxmo.enable(true);
 
