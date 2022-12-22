@@ -27,40 +27,19 @@ static std::string POWER_ON = "SI01";
 static std::string SET_FAVORITE = "SP02";
 
 unsigned int lastButtonState = 1;
-unsigned long buttonPressStartTime = -1;
+unsigned long buttonPressStartTime = 0;
 // A short press must be shorter than this threshold and turns the device on.
 const unsigned int shortPressMillis = 1000;
 // A long hold must be longer than this threshold and turns the device off.
 const unsigned int longHoldMillis = 2000;
-// A long hold longer than this threadhold will cause the ESP32 to disconnect
-// from BLE and not reconnect until a reset.
-const unsigned int veryLongHoldMillis = 5000;
 
 bool changeDeviceState = false;
 bool newDeviceState = false;
-bool longHoldTriggered = false;
 
-static boolean connected = false;
-static boolean shouldConnect = true;
 static NimBLEClient* client = nullptr;
 static BLERemoteCharacteristic* remoteCharacteristic;
 
-const unsigned int connectionAttemptInterval = 5000;
-unsigned long lastConnectionAttempt = 0;
-
 fauxmoESP fauxmo;
-
-void disconnected(String message) {
-  Serial.printf("Connection to Hatch Rest lost! (%s)\r\n", message.c_str());
-  digitalWrite(LED_BUILTIN, 0);
-  connected = false;
-}
-
-class HatchRestClientCallbacks : public BLEClientCallbacks {
-  void onDisconnect(BLEClient* client) {
-    disconnected("via callback");
-  }
-};
 
 void connectWifi() {
   Serial.printf("Connecting to wifi network %s...\r\n", WIFI_SSID);
@@ -75,7 +54,7 @@ void connectWifi() {
   Serial.printf("Connected to wifi with IP address: %s\r\n", WiFi.localIP().toString());
 }
 
-void connectToHatchRest() {
+bool connectToHatch() {
   if (client == nullptr) {
     client = BLEDevice::createClient();
   }
@@ -100,7 +79,7 @@ void connectToHatchRest() {
   if (remoteService == nullptr) {
     Serial.println("Failed to find our service UUID");
     client->disconnect();
-    return;
+    return false;
   }
   Serial.println(" - Found our service");
 
@@ -108,13 +87,19 @@ void connectToHatchRest() {
   if (remoteCharacteristic == nullptr) {
     Serial.println("Failed to find our characteristic UUID");
     client->disconnect();
-    return;
+    return false;
   }
   Serial.println(" - Found our characteristic");
 
   Serial.println("Ready to control device!");
-  connected = true;
   digitalWrite(LED_BUILTIN, 1);
+  return true;
+}
+
+void disconnectFromHatch() {
+  Serial.println("Disconnecting from Hatch...");
+  client->disconnect();
+  digitalWrite(LED_BUILTIN, 0);
 }
 
 void setDeviceState(bool state) {
@@ -123,6 +108,11 @@ void setDeviceState(bool state) {
 }
 
 void setDeviceStateActually(bool state) {
+  if (!connectToHatch()) {
+    Serial.println("Couldn't connect to Hatch!");
+    return;
+  }
+
   if (state) {
     Serial.println("Turning Hatch Rest on...");
     // When we tap the touch ring on the device to turn it on and off, it doesn't
@@ -141,6 +131,8 @@ void setDeviceStateActually(bool state) {
     Serial.println("Turning Hatch Rest off...");
     remoteCharacteristic->writeValue(POWER_OFF);
   }
+
+  disconnectFromHatch();
 }
 
 void setupAlexaDevice() {
@@ -188,7 +180,6 @@ void loop() {
     if (buttonState == 0) {
       // The button is active low, so this is the beginning of a press/hold.
       buttonPressStartTime = currentMillis;
-      longHoldTriggered = false;
     } else if (buttonState == 1) {
       // If the button was released within the threshold, turn on the device.
       if (currentMillis - buttonPressStartTime < shortPressMillis) {
@@ -196,43 +187,19 @@ void loop() {
       }
 
       // Reset the button press timer when the button is released.
-      buttonPressStartTime = -1;
+      buttonPressStartTime = 0;
     }
   }
 
-  if (buttonPressStartTime != -1) {
-    const unsigned long buttonPressMillis = currentMillis - buttonPressStartTime;
-
-    if (!longHoldTriggered && buttonPressMillis > longHoldMillis) {
-      setDeviceState(false);
-      longHoldTriggered = true;
-    } else if (buttonPressMillis > veryLongHoldMillis) {
-      Serial.println("Disconnecting from BLE and will not reconnect until reset");
-      client->disconnect();
-      disconnected("via manual button press");
-
-      // Never try reconnecting (until a reset).
-      shouldConnect = false;
-
-      // Only reset the button press when a very long hold is triggered.
-      // When a long hold is triggered, we want to keep the timer running
-      // in case it turns into a very long hold.
-      buttonPressStartTime = -1;
-    }
+  if (buttonPressStartTime != 0 && currentMillis - buttonPressStartTime > longHoldMillis) {
+    // Once the button has been held longer than the threshold, turn off the device.
+    setDeviceState(false);
+    // Consider the button press over once it's triggered a long hold.
+    buttonPressStartTime = 0;
   }
 
-  if (connected) {
-    if (!client->isConnected()) {
-      disconnected("via detection");
-    } else if (changeDeviceState) {
-      setDeviceStateActually(newDeviceState);
-      changeDeviceState = false;
-    }
-  } else if (shouldConnect) {
-    if (lastConnectionAttempt == 0 || 
-        currentMillis - lastConnectionAttempt > connectionAttemptInterval) {
-      lastConnectionAttempt = currentMillis;
-      connectToHatchRest();
-    }
+  if (changeDeviceState) {
+    setDeviceStateActually(newDeviceState);
+    changeDeviceState = false;
   }
 }
