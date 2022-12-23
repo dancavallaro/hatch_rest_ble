@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include <NimBLEDevice.h>
 #include <WiFi.h>
 #include <fauxmoESP.h>
@@ -155,6 +156,33 @@ void setupAlexaDevice() {
   Serial.println("Done setting up Alexa device");
 }
 
+void setupOta() {
+  ArduinoOTA.setPassword("zUpmVKpRJV5b8TpQFghg");
+  ArduinoOTA.setHostname("hatchmeifyoucan");
+  ArduinoOTA
+    .onStart([]() {
+      Serial.println("Starting OTA update");
+    })
+    .onEnd([]() {
+      Serial.println("\nFinished OTA update");
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("OTA update failed with error [%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+      else Serial.println("(unknown)");
+    });
+  ArduinoOTA.begin();
+
+  Serial.println("Done initializing OTA");
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -165,10 +193,12 @@ void setup() {
   BLEDevice::init("HatchRestClient");
 
   connectWifi();
+  setupOta();
   setupAlexaDevice();
 }
 
 void loop() {
+  ArduinoOTA.handle();
   fauxmo.handle();
 
   unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
