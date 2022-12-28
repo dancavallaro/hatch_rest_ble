@@ -5,7 +5,7 @@
 #include <WiFi.h>
 #include <fauxmoESP.h>
 
-#define BUTTON_BUILTIN 0
+#define BUTTON_BUILTIN 39
 
 #define WIFI_SSID "dtcnet"
 #define WIFI_PASSWORD "danandlauren"
@@ -105,7 +105,6 @@ bool connectToHatch() {
   Serial.println(" - Found our characteristic");
 
   Serial.println("Ready to control device!");
-  digitalWrite(LED_BUILTIN, 1);
   return true;
 }
 
@@ -124,7 +123,6 @@ void connectToMqtt() {
 void disconnectFromHatch() {
   Serial.println("Disconnecting from Hatch...");
   client->disconnect();
-  digitalWrite(LED_BUILTIN, 0);
 }
 
 void setDeviceState(bool state) {
@@ -203,6 +201,7 @@ void setupAlexaDevice() {
   Serial.println("Done setting up Alexa device");
 }
 
+// TODO: fix OTA (revert platformio changes)
 void setupOta() {
   ArduinoOTA.setPassword("zUpmVKpRJV5b8TpQFghg");
   ArduinoOTA.setHostname("hatchmeifyoucan");
@@ -234,8 +233,6 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(BUTTON_BUILTIN, INPUT);
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, 0);
 
   BLEDevice::init("HatchRestClient");
 
