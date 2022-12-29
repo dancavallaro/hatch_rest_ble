@@ -1,20 +1,10 @@
 #include <Arduino.h>
-#include <ArduinoOTA.h>
 #include <NimBLEDevice.h>
-#include <PubSubClient.h>
-#include <WiFi.h>
-#include <fauxmoESP.h>
+#include "common.h"
 
 #define BUTTON_BUILTIN 39
 
-#define WIFI_SSID "dtcnet"
-#define WIFI_PASSWORD "danandlauren"
-
 #define ALEXA_DEVICE_NAME "hatch"
-
-#define MQTT_BROKER_HOSTNAME "rpi.local"
-#define MQTT_USERNAME "hatch"
-#define MQTT_PASSWORD "7ynnSGsZHRMwDr3jhCJjCyTZ"
 
 // Unique ID to use for the Alexa device. Don't change this!
 // This ID allow Alexa to uniquely identify the device, including
@@ -45,27 +35,8 @@ bool newDeviceState = false;
 static NimBLEClient* client = nullptr;
 static BLERemoteCharacteristic* remoteCharacteristic;
 
-fauxmoESP fauxmo;
-
-WiFiClient wifiClient;
-PubSubClient mqttClient(wifiClient);
-unsigned long lastMqttConnectionAttempt = 0;
-const char *MQTT_ID = "HatchController";
 const char *MQTT_CONTROL_TOPIC = "nursery/hatch";
 const char *MQTT_STATE_TOPIC = "nursery/hatch/state";
-
-void connectWifi() {
-  Serial.printf("Connecting to wifi network %s...\r\n", WIFI_SSID);
-
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.println("Connecting...");
-  }
-
-  Serial.printf("Connected to wifi with IP address: %s\r\n", WiFi.localIP().toString());
-}
 
 bool connectToHatch() {
   if (client == nullptr) {
@@ -108,18 +79,6 @@ bool connectToHatch() {
   return true;
 }
 
-void connectToMqtt() {
-  lastMqttConnectionAttempt = millis();
-  Serial.println("Trying to connect to MQTT broker");
-
-  if (mqttClient.connect(MQTT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
-    mqttClient.subscribe(MQTT_CONTROL_TOPIC);
-    Serial.printf("Connected to broker and subscribed to topic %s\r\n", MQTT_CONTROL_TOPIC);
-  } else {
-    Serial.println("Couldn't connect to MQTT broker!");
-  }
-}
-
 void disconnectFromHatch() {
   Serial.println("Disconnecting from Hatch...");
   client->disconnect();
@@ -159,10 +118,10 @@ void setDeviceStateActually(bool state) {
   disconnectFromHatch();
 
   const char *newState = state ? "ON" : "OFF";
-  mqttClient.publish(MQTT_STATE_TOPIC, newState);
+  mqttClient()->publish(MQTT_STATE_TOPIC, newState);
 }
 
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
+void mqttMessageReceivedCallback(char* topic, byte* payload, unsigned int length) {
   char response[length+1];
   
   for (int i = 0; i < length; i++) {
@@ -181,84 +140,31 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-void setupAlexaDevice() {
-  Serial.println("Setting up Alexa device");
-
-  unsigned char deviceId = fauxmo.addDevice(ALEXA_DEVICE_NAME);
-  fauxmo.setDeviceUniqueId(deviceId, ALEXA_DEVICE_UNIQUE_ID);
-
-  fauxmo.setPort(80);
-  fauxmo.enable(true);
-
-  fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
-    Serial.printf("[Alexa] Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
-    
-    if (strcmp(device_name, ALEXA_DEVICE_NAME) == 0) {
-      setDeviceState(state);
-    }
-  });
-
-  Serial.println("Done setting up Alexa device");
+void mqttPostConnectCallback(PubSubClient* client) {
+  client->subscribe(MQTT_CONTROL_TOPIC);
+  Serial.printf("Connected to broker and subscribed to topic %s\r\n", MQTT_CONTROL_TOPIC);
 }
 
-// TODO: fix OTA (revert platformio changes)
-void setupOta() {
-  ArduinoOTA.setPassword("zUpmVKpRJV5b8TpQFghg");
-  ArduinoOTA.setHostname("hatchmeifyoucan");
-  ArduinoOTA
-    .onStart([]() {
-      Serial.println("Starting OTA update");
-    })
-    .onEnd([]() {
-      Serial.println("\nFinished OTA update");
-    })
-    .onProgress([](unsigned int progress, unsigned int total) {
-      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    })
-    .onError([](ota_error_t error) {
-      Serial.printf("OTA update failed with error [%u]: ", error);
-      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-      else if (error == OTA_END_ERROR) Serial.println("End Failed");
-      else Serial.println("(unknown)");
-    });
-  ArduinoOTA.begin();
-
-  Serial.println("Done initializing OTA");
+void alexaAddDevices(fauxmoESP* fauxmo) {
+  unsigned char deviceId = fauxmo->addDevice(ALEXA_DEVICE_NAME);
+  fauxmo->setDeviceUniqueId(deviceId, ALEXA_DEVICE_UNIQUE_ID);
 }
 
-void setup() {
-  Serial.begin(115200);
+void alexaOnSetState(unsigned char device_id, const char * device_name, bool state, unsigned char value) {
+  Serial.printf("[Alexa] Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
+  
+  if (strcmp(device_name, ALEXA_DEVICE_NAME) == 0) {
+    setDeviceState(state);
+  }
+}
 
+void doSetup() {
   pinMode(BUTTON_BUILTIN, INPUT);
 
   BLEDevice::init("HatchRestClient");
-
-  connectWifi();
-  setupOta();
-  setupAlexaDevice();
-
-  mqttClient.setServer(MQTT_BROKER_HOSTNAME, 1883);
-  mqttClient.setCallback(mqttCallback);
-  connectToMqtt();
 }
 
-void loop() {
-  ArduinoOTA.handle();
-  fauxmo.handle();
-
-  const unsigned long currentMillis = millis();
-
-  if (!mqttClient.connected()) {
-    // Wait a second in between attempts to connect to broker.
-    if (currentMillis - lastMqttConnectionAttempt > 1000) {
-      connectToMqtt();
-    }
-  }
-  mqttClient.loop();
-
+void doLoop(unsigned long currentMillis) {
   unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
 
   if (buttonState != lastButtonState) {
