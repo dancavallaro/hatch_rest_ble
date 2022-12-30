@@ -121,19 +121,10 @@ void setDeviceStateActually(bool state) {
   mqttClient()->publish(MQTT_STATE_TOPIC, newState);
 }
 
-void mqttMessageReceivedCallback(char* topic, byte* payload, unsigned int length) {
-  char response[length+1];
-  
-  for (int i = 0; i < length; i++) {
-    response[i] = (char)payload[i];
-  }
-  response[length] = '\0';
-
-  Serial.printf("[MQTT] Message arrived on topic [%s]: [%s]\r\n", topic, response);
-
-  if (strcmp(response, "ON") == 0) {
+void mqttMessageReceivedCallback(char* topic, char* message) {
+  if (strcmp(message, "ON") == 0) {
     setDeviceState(true);
-  } else if (strcmp(response, "OFF") == 0) {
+  } else if (strcmp(message, "OFF") == 0) {
     setDeviceState(false);
   } else {
     Serial.println("Invalid MQTT command");
