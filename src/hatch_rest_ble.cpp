@@ -8,6 +8,8 @@
 static BLEAddress deviceAddress("ef:d8:7b:5c:59:92", 1);
 static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
 static BLEUUID    charUUID("02240002-5efd-47eb-9c1a-de53f7a2b232");
+static BLEUUID feedbackServiceUUID("02260001-5efd-47eb-9c1a-de53f7a2b232");
+static BLEUUID    feedbackCharUUID("02260002-5efd-47eb-9c1a-de53f7a2b232");
 
 // Commands for controlling the Hatch over BLE
 static std::string POWER_OFF = "SI00";
@@ -23,15 +25,33 @@ const unsigned int longHoldMillis = 2000;
 
 bool changeDeviceState = false;
 bool newDeviceState = false;
-bool deviceState = false;
 
 static NimBLEClient* client = nullptr;
-static BLERemoteCharacteristic* remoteCharacteristic;
 
 const char *MQTT_CONTROL_TOPIC = "nursery/hatch";
 const char *MQTT_STATE_TOPIC = "nursery/hatch/state";
 
-bool connectToHatch() {
+BLERemoteCharacteristic* getCharacteristic(BLEUUID service, BLEUUID characteristic) {
+    BLERemoteService* remoteService = client->getService(service);
+    if (remoteService == nullptr) {
+        Serial.println("Failed to find our service UUID");
+        client->disconnect();
+        return nullptr;
+    }
+    Serial.println(" - Found our service");
+
+    BLERemoteCharacteristic* remoteCharacteristic = remoteService->getCharacteristic(characteristic);
+    if (remoteCharacteristic == nullptr) {
+        Serial.println("Failed to find our characteristic UUID");
+        client->disconnect();
+        return nullptr;
+    }
+    Serial.println(" - Found our characteristic");
+
+    return remoteCharacteristic;
+}
+
+void connectToHatch() {
   if (client == nullptr) {
     client = BLEDevice::createClient();
   }
@@ -52,29 +72,48 @@ bool connectToHatch() {
     delay(10);
   }
 
-  BLERemoteService* remoteService = client->getService(serviceUUID);
-  if (remoteService == nullptr) {
-    Serial.println("Failed to find our service UUID");
-    client->disconnect();
-    return false;
-  }
-  Serial.println(" - Found our service");
-
-  remoteCharacteristic = remoteService->getCharacteristic(charUUID);
-  if (remoteCharacteristic == nullptr) {
-    Serial.println("Failed to find our characteristic UUID");
-    client->disconnect();
-    return false;
-  }
-  Serial.println(" - Found our characteristic");
-
   Serial.println("Ready to control device!");
-  return true;
 }
 
 void disconnectFromHatch() {
   Serial.println("Disconnecting from Hatch...");
   client->disconnect();
+}
+
+void mqttPublishState(bool state) {
+  const char *stateStr = state ? "ON" : "OFF";
+  mqttClient()->publish(MQTT_STATE_TOPIC, stateStr);
+}
+
+bool decodePowerState(const char* feedback) {
+    while (*feedback) {
+        if (*feedback == 0x54) {
+            feedback += 5;
+        } else if (*feedback == 0x43) {
+            feedback += 5;
+        } else if (*feedback == 0x53) {
+            feedback += 3;
+        } else if (*feedback == 0x50) {
+            char data = *(feedback + 1);
+            return (data != 0) && (data & 0xc0) == 0;
+        }
+    }
+    return false;
+}
+
+void mqttPublishState() {
+    connectToHatch();
+
+    BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(feedbackServiceUUID, feedbackCharUUID);
+    if (remoteCharacteristic == nullptr) {
+        Serial.println("Couldn't connect to Hatch!");
+        return;
+    }
+
+    const char* feedback = remoteCharacteristic->readValue().c_str();
+    bool powerState = decodePowerState(feedback);
+    disconnectFromHatch();
+    mqttPublishState(powerState);
 }
 
 void setDeviceState(bool state) {
@@ -84,7 +123,10 @@ void setDeviceState(bool state) {
 }
 
 void setDeviceStateActually(bool state) {
-  if (!connectToHatch()) {
+  connectToHatch();
+
+  BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(serviceUUID, charUUID);
+  if (remoteCharacteristic == nullptr) {
     Serial.println("Couldn't connect to Hatch!");
     return;
   }
@@ -109,14 +151,7 @@ void setDeviceStateActually(bool state) {
   }
 
   disconnectFromHatch();
-  deviceState = state;
-  mqttPublishState();
-}
-
-// TODO: Refresh this from the device by decoding the feedback characteristic.
-void mqttPublishState() {
-    const char *state = deviceState ? "ON" : "OFF";
-    mqttClient()->publish(MQTT_STATE_TOPIC, state);
+  mqttPublishState(state);
 }
 
 void mqttMessageReceivedCallback(char* topic, char* message) {
