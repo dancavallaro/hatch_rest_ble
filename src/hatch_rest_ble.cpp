@@ -23,6 +23,9 @@ const unsigned int shortPressMillis = 1000;
 // A long hold must be longer than this threshold and turns the device off.
 const unsigned int longHoldMillis = 2000;
 
+unsigned int lastMqttStateUpdateMillis = 0;
+const unsigned int stateUpdateIntervalMillis = 60 * 1000;
+
 bool changeDeviceState = false;
 bool newDeviceState = false;
 
@@ -102,6 +105,12 @@ bool decodePowerState(const char* feedback) {
 }
 
 void mqttPublishState() {
+    if (millis() - lastMqttStateUpdateMillis > stateUpdateIntervalMillis) {
+        lastMqttStateUpdateMillis = millis();
+    } else {
+        return;
+    }
+
     connectToHatch();
 
     BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(feedbackServiceUUID, feedbackCharUUID);
