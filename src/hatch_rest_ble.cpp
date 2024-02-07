@@ -4,14 +4,6 @@
 
 #define BUTTON_BUILTIN 39
 
-#define ALEXA_DEVICE_NAME "hatch"
-
-// Unique ID to use for the Alexa device. Don't change this!
-// This ID allow Alexa to uniquely identify the device, including
-// when the name changes. This will also allow this firmware to run on
-// a different controller but appear as the same device to Alexa.
-#define ALEXA_DEVICE_UNIQUE_ID "e0:4c:a9:40:33:c2:62:03-00"
-
 // Identifiers for connecting to the Hatch over BLE
 static BLEAddress deviceAddress("ef:d8:7b:5c:59:92", 1);
 static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
@@ -134,19 +126,6 @@ void mqttMessageReceivedCallback(char* topic, char* message) {
 void mqttPostConnectCallback(PubSubClient* client) {
   client->subscribe(MQTT_CONTROL_TOPIC);
   Serial.printf("Connected to broker and subscribed to topic %s\r\n", MQTT_CONTROL_TOPIC);
-}
-
-void alexaAddDevices(fauxmoESP* fauxmo) {
-  unsigned char deviceId = fauxmo->addDevice(ALEXA_DEVICE_NAME);
-  fauxmo->setDeviceUniqueId(deviceId, ALEXA_DEVICE_UNIQUE_ID);
-}
-
-void alexaOnSetState(unsigned char device_id, const char * device_name, bool state, unsigned char value) {
-  Serial.printf("[Alexa] Device #%d (%s) state: %s\r\n", device_id, device_name, state ? "ON" : "OFF");
-  
-  if (strcmp(device_name, ALEXA_DEVICE_NAME) == 0) {
-    setDeviceState(state);
-  }
 }
 
 void doSetup() {
