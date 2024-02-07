@@ -23,6 +23,7 @@ const unsigned int longHoldMillis = 2000;
 
 bool changeDeviceState = false;
 bool newDeviceState = false;
+bool deviceState = false;
 
 static NimBLEClient* client = nullptr;
 static BLERemoteCharacteristic* remoteCharacteristic;
@@ -108,9 +109,14 @@ void setDeviceStateActually(bool state) {
   }
 
   disconnectFromHatch();
+  deviceState = state;
+  mqttPublishState();
+}
 
-  const char *newState = state ? "ON" : "OFF";
-  mqttClient()->publish(MQTT_STATE_TOPIC, newState);
+// TODO: Refresh this from the device by decoding the feedback characteristic.
+void mqttPublishState() {
+    const char *state = deviceState ? "ON" : "OFF";
+    mqttClient()->publish(MQTT_STATE_TOPIC, state);
 }
 
 void mqttMessageReceivedCallback(char* topic, char* message) {
