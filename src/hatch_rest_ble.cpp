@@ -55,37 +55,37 @@ BLERemoteCharacteristic* getCharacteristic(BLEUUID service, BLEUUID characterist
 }
 
 void connectToHatch() {
-  if (client == nullptr) {
-    client = BLEDevice::createClient();
-  }
-
-  Serial.println("Attempting to connect to Hatch Rest...");
-
-  for (;;) {
-    if (!client->connect(deviceAddress)) {
-      Serial.println("Failed to connect to device!");
-    } else if (!client->isConnected()) {
-      Serial.println("Connection appeared to be successful but now we're disconnected");
-    } else {
-      Serial.println("Connected to device!");
-      break;
+    if (client == nullptr) {
+        client = BLEDevice::createClient();
     }
 
-    // If we failed to connect or disconnected, just keep trying after a short delay.
-    delay(10);
-  }
+    Serial.println("Attempting to connect to Hatch Rest...");
 
-  Serial.println("Ready to control device!");
+    for (;;) {
+        if (!client->connect(deviceAddress)) {
+            Serial.println("Failed to connect to device!");
+        } else if (!client->isConnected()) {
+            Serial.println("Connection appeared to be successful but now we're disconnected");
+        } else {
+            Serial.println("Connected to device!");
+            break;
+        }
+
+        // If we failed to connect or disconnected, just keep trying after a short delay.
+        delay(10);
+    }
+
+    Serial.println("Ready to control device!");
 }
 
 void disconnectFromHatch() {
-  Serial.println("Disconnecting from Hatch...");
-  client->disconnect();
+    Serial.println("Disconnecting from Hatch...");
+    client->disconnect();
 }
 
 void mqttPublishState(bool state) {
-  const char *stateStr = state ? "ON" : "OFF";
-  mqttClient()->publish(MQTT_STATE_TOPIC, stateStr);
+    const char *stateStr = state ? "ON" : "OFF";
+    mqttClient()->publish(MQTT_STATE_TOPIC, stateStr);
 }
 
 bool decodePowerState(const char* feedback) {
@@ -126,93 +126,93 @@ void mqttPublishState() {
 }
 
 void setDeviceState(bool state) {
-  Serial.printf("Will set state to %s\r\n", state ? "ON" : "OFF");
-  changeDeviceState = true;
-  newDeviceState = state;
+    Serial.printf("Will set state to %s\r\n", state ? "ON" : "OFF");
+    changeDeviceState = true;
+    newDeviceState = state;
 }
 
 void setDeviceStateActually(bool state) {
-  connectToHatch();
+    connectToHatch();
 
-  BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(serviceUUID, charUUID);
-  if (remoteCharacteristic == nullptr) {
-    Serial.println("Couldn't connect to Hatch!");
-    return;
-  }
+    BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(serviceUUID, charUUID);
+    if (remoteCharacteristic == nullptr) {
+        Serial.println("Couldn't connect to Hatch!");
+        return;
+    }
 
-  if (state) {
-    Serial.println("Turning Hatch Rest on...");
-    // When we tap the touch ring on the device to turn it on and off, it doesn't
-    // *actually* cycle the power, it's really just cycling through the presets.
-    // one preset is the ocean sound, and the other preset has 0 volume and changes
-    // the track to "none". This means that if the device was last turned off by
-    // physically touching the ring, simply sending a power on command won't start
-    // playing sound, since it's still set to the no-sound preset. So when turning
-    // it on we send the "set favorite" command to make sure that the right track is
-    // playing, regardless of how it was last turned off. Note that when turning 
-    // it off we *can* simply send the power off command, and that'll work regardless
-    // of how it was turned on.
-    remoteCharacteristic->writeValue(SET_FAVORITE);
-    remoteCharacteristic->writeValue(POWER_ON);
-  } else {
-    Serial.println("Turning Hatch Rest off...");
-    remoteCharacteristic->writeValue(POWER_OFF);
-  }
+    if (state) {
+        Serial.println("Turning Hatch Rest on...");
+        // When we tap the touch ring on the device to turn it on and off, it doesn't
+        // *actually* cycle the power, it's really just cycling through the presets.
+        // one preset is the ocean sound, and the other preset has 0 volume and changes
+        // the track to "none". This means that if the device was last turned off by
+        // physically touching the ring, simply sending a power on command won't start
+        // playing sound, since it's still set to the no-sound preset. So when turning
+        // it on we send the "set favorite" command to make sure that the right track is
+        // playing, regardless of how it was last turned off. Note that when turning
+        // it off we *can* simply send the power off command, and that'll work regardless
+        // of how it was turned on.
+        remoteCharacteristic->writeValue(SET_FAVORITE);
+        remoteCharacteristic->writeValue(POWER_ON);
+    } else {
+        Serial.println("Turning Hatch Rest off...");
+        remoteCharacteristic->writeValue(POWER_OFF);
+    }
 
-  disconnectFromHatch();
-  mqttPublishState(state);
+    disconnectFromHatch();
+    mqttPublishState(state);
 }
 
 void mqttMessageReceivedCallback(char* topic, char* message) {
-  if (strcmp(message, "ON") == 0) {
-    setDeviceState(true);
-  } else if (strcmp(message, "OFF") == 0) {
-    setDeviceState(false);
-  } else {
-    Serial.println("Invalid MQTT command");
-  }
+    if (strcmp(message, "ON") == 0) {
+        setDeviceState(true);
+    } else if (strcmp(message, "OFF") == 0) {
+        setDeviceState(false);
+    } else {
+        Serial.println("Invalid MQTT command");
+    }
 }
 
 void mqttPostConnectCallback(PubSubClient* client) {
-  client->subscribe(MQTT_CONTROL_TOPIC);
-  Serial.printf("Connected to broker and subscribed to topic %s\r\n", MQTT_CONTROL_TOPIC);
+    client->subscribe(MQTT_CONTROL_TOPIC);
+    Serial.printf("Connected to broker and subscribed to topic %s\r\n", MQTT_CONTROL_TOPIC);
 }
 
 void doSetup() {
-  pinMode(BUTTON_BUILTIN, INPUT);
+    pinMode(BUTTON_BUILTIN, INPUT);
 
-  BLEDevice::init("HatchRestClient");
+    BLEDevice::init("HatchRestClient");
 }
 
 void doLoop(unsigned long currentMillis) {
-  unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
+    unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
 
-  if (buttonState != lastButtonState) {
-    lastButtonState = buttonState;
+    if (buttonState != lastButtonState) {
+        lastButtonState = buttonState;
 
-    if (buttonState == 0) {
-      // The button is active low, so this is the beginning of a press/hold.
-      buttonPressStartTime = currentMillis;
-    } else if (buttonState == 1) {
-      // If the button was released within the threshold, turn on the device.
-      if (currentMillis - buttonPressStartTime < shortPressMillis) {
-        setDeviceState(true);
-      }
+        if (buttonState == 0) {
+            // The button is active low, so this is the beginning of a press/hold.
+            buttonPressStartTime = currentMillis;
+        } else if (buttonState == 1) {
+            // If the button was released within the threshold, turn on the device.
+            if (currentMillis - buttonPressStartTime < shortPressMillis) {
+                setDeviceState(true);
+            }
 
-      // Reset the button press timer when the button is released.
-      buttonPressStartTime = 0;
+            // Reset the button press timer when the button is released.
+            buttonPressStartTime = 0;
+        }
     }
-  }
 
-  if (buttonPressStartTime != 0 && currentMillis - buttonPressStartTime > longHoldMillis) {
-    // Once the button has been held longer than the threshold, turn off the device.
-    setDeviceState(false);
-    // Consider the button press over once it's triggered a long hold.
-    buttonPressStartTime = 0;
-  }
+    if (buttonPressStartTime != 0 && currentMillis - buttonPressStartTime > longHoldMillis) {
+        // Once the button has been held longer than the threshold, turn off the device.
+        setDeviceState(false);
+        // Consider the button press over once it's triggered a long hold.
+        buttonPressStartTime = 0;
+    }
 
-  if (changeDeviceState) {
-    setDeviceStateActually(newDeviceState);
-    changeDeviceState = false;
-  }
+    if (changeDeviceState) {
+        setDeviceStateActually(newDeviceState);
+        changeDeviceState = false;
+    }
 }
