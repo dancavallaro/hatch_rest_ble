@@ -11,10 +11,10 @@ static BLEUUID    charUUID("02240002-5efd-47eb-9c1a-de53f7a2b232");
 static BLEUUID feedbackServiceUUID("02260001-5efd-47eb-9c1a-de53f7a2b232");
 static BLEUUID    feedbackCharUUID("02260002-5efd-47eb-9c1a-de53f7a2b232");
 
-// Commands for controlling the Hatch over BLE
-static std::string POWER_OFF = "SI00";
-static std::string POWER_ON = "SI01";
-static std::string SET_FAVORITE = "SP02";
+// Play Favorite #1, which is no song and no color ("fake off").
+static std::string TURN_OFF = "SP01";
+// Play Favorite #2, the white noise/ocean sound with red light.
+static std::string TURN_ON = "SP02";
 
 unsigned int lastButtonState = 1;
 unsigned long buttonPressStartTime = 0;
@@ -142,21 +142,10 @@ void setDeviceStateActually(bool state) {
 
     if (state) {
         Serial.println("Turning Hatch Rest on...");
-        // When we tap the touch ring on the device to turn it on and off, it doesn't
-        // *actually* cycle the power, it's really just cycling through the presets.
-        // one preset is the ocean sound, and the other preset has 0 volume and changes
-        // the track to "none". This means that if the device was last turned off by
-        // physically touching the ring, simply sending a power on command won't start
-        // playing sound, since it's still set to the no-sound preset. So when turning
-        // it on we send the "set favorite" command to make sure that the right track is
-        // playing, regardless of how it was last turned off. Note that when turning
-        // it off we *can* simply send the power off command, and that'll work regardless
-        // of how it was turned on.
-        remoteCharacteristic->writeValue(SET_FAVORITE);
-        remoteCharacteristic->writeValue(POWER_ON);
+        remoteCharacteristic->writeValue(TURN_ON);
     } else {
         Serial.println("Turning Hatch Rest off...");
-        remoteCharacteristic->writeValue(POWER_OFF);
+        remoteCharacteristic->writeValue(TURN_OFF);
     }
 
     disconnectFromHatch();
