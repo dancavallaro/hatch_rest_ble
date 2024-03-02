@@ -15,6 +15,8 @@ static BLEUUID    feedbackCharUUID("02260002-5efd-47eb-9c1a-de53f7a2b232");
 static std::string TURN_OFF = "SP01";
 // Play Favorite #2, the white noise/ocean sound with red light.
 static std::string TURN_ON = "SP02";
+// Turn the power on
+static std::string POWER_ON = "SI01";
 
 unsigned int lastButtonState = 1;
 unsigned long buttonPressStartTime = 0;
@@ -104,6 +106,32 @@ bool decodePowerState(const char* feedback) {
     return false;
 }
 
+void setDeviceStateActually(bool state, bool powerOn) {
+    connectToHatch();
+
+    BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(serviceUUID, charUUID);
+    if (remoteCharacteristic == nullptr) {
+        Serial.println("Couldn't connect to Hatch!");
+        return;
+    }
+
+    if (state) {
+        Serial.println("Turning on white noise and light...");
+        remoteCharacteristic->writeValue(TURN_ON);
+    } else {
+        Serial.println("Turning off noise and light...");
+        remoteCharacteristic->writeValue(TURN_OFF);
+    }
+
+    if (powerOn) {
+        Serial.println("Turning power on");
+        remoteCharacteristic->writeValue(POWER_ON);
+    }
+
+    disconnectFromHatch();
+    mqttPublishState(state);
+}
+
 void mqttPublishState() {
     if (millis() - lastMqttStateUpdateMillis > stateUpdateIntervalMillis) {
         lastMqttStateUpdateMillis = millis();
@@ -121,7 +149,13 @@ void mqttPublishState() {
 
     const char* feedback = remoteCharacteristic->readValue().c_str();
     bool powerState = decodePowerState(feedback);
+    Serial.printf("Hatch is currently %s\r\n", powerState ? "ON" : "OFF");
     disconnectFromHatch();
+    if (!powerState) {
+        Serial.println("Turning power on");
+        // Turn the power on, but keep it in "off" mode.
+        setDeviceStateActually(false, true);
+    }
     mqttPublishState(powerState);
 }
 
@@ -129,27 +163,6 @@ void setDeviceState(bool state) {
     Serial.printf("Will set state to %s\r\n", state ? "ON" : "OFF");
     changeDeviceState = true;
     newDeviceState = state;
-}
-
-void setDeviceStateActually(bool state) {
-    connectToHatch();
-
-    BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(serviceUUID, charUUID);
-    if (remoteCharacteristic == nullptr) {
-        Serial.println("Couldn't connect to Hatch!");
-        return;
-    }
-
-    if (state) {
-        Serial.println("Turning Hatch Rest on...");
-        remoteCharacteristic->writeValue(TURN_ON);
-    } else {
-        Serial.println("Turning Hatch Rest off...");
-        remoteCharacteristic->writeValue(TURN_OFF);
-    }
-
-    disconnectFromHatch();
-    mqttPublishState(state);
 }
 
 void mqttMessageReceivedCallback(char* topic, char* message) {
@@ -201,7 +214,7 @@ void doLoop(unsigned long currentMillis) {
     }
 
     if (changeDeviceState) {
-        setDeviceStateActually(newDeviceState);
+        setDeviceStateActually(newDeviceState, false);
         changeDeviceState = false;
     }
 }
