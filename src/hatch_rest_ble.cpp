@@ -139,24 +139,24 @@ void mqttPublishState() {
         return;
     }
 
-    connectToHatch();
-
-    BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(feedbackServiceUUID, feedbackCharUUID);
-    if (remoteCharacteristic == nullptr) {
-        Serial.println("Couldn't connect to Hatch!");
-        return;
-    }
-
-    const char* feedback = remoteCharacteristic->readValue().c_str();
-    bool powerState = decodePowerState(feedback);
-    Serial.printf("Hatch is currently %s\r\n", powerState ? "ON" : "OFF");
-    disconnectFromHatch();
-    if (!powerState) {
-        Serial.println("Turning power on");
-        // Turn the power on, but keep it in "off" mode.
-        setDeviceStateActually(false, true);
-    }
-    mqttPublishState(powerState);
+//    connectToHatch();
+//
+//    BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(feedbackServiceUUID, feedbackCharUUID);
+//    if (remoteCharacteristic == nullptr) {
+//        Serial.println("Couldn't connect to Hatch!");
+//        return;
+//    }
+//
+//    const char* feedback = remoteCharacteristic->readValue().c_str();
+//    bool powerState = decodePowerState(feedback);
+//    Serial.printf("Hatch is currently %s\r\n", powerState ? "ON" : "OFF");
+//    disconnectFromHatch();
+//    if (!powerState) {
+//        Serial.println("Turning power on");
+//        // Turn the power on, but keep it in "off" mode.
+//        setDeviceStateActually(false, true);
+//    }
+//    mqttPublishState(powerState);
 }
 
 void setDeviceState(bool state) {
