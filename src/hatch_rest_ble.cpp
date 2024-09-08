@@ -11,10 +11,10 @@ static BLEUUID    charUUID("02240002-5efd-47eb-9c1a-de53f7a2b232");
 static BLEUUID feedbackServiceUUID("02260001-5efd-47eb-9c1a-de53f7a2b232");
 static BLEUUID    feedbackCharUUID("02260002-5efd-47eb-9c1a-de53f7a2b232");
 
-// Play Favorite #1, which is no song and no color ("fake off").
-static std::string TURN_OFF = "SP01";
-// Play Favorite #2, the white noise/ocean sound with red light.
-static std::string TURN_ON = "SP02";
+// No song and no light ("off")
+static std::string TURN_OFF = "SP05";
+// Ocean sound with red light
+static std::string TURN_ON = "SP03";
 // Turn the power on
 static std::string POWER_ON = "SI01";
 
@@ -22,7 +22,7 @@ unsigned int lastMqttStateUpdateMillis = 0;
 const unsigned int stateUpdateIntervalMillis = 60 * 1000;
 
 bool changeDeviceState = false;
-bool newDeviceState = false;
+std::string newDeviceState;
 
 static NimBLEClient* client = nullptr;
 
@@ -93,7 +93,7 @@ bool decodePowerState(const char* feedback) {
     return false;
 }
 
-void setDeviceStateActually(bool state, bool powerOn) {
+void setDeviceStateActually(bool powerOn, const std::string& command) {
     connectToHatch();
 
     BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(serviceUUID, charUUID);
@@ -102,13 +102,8 @@ void setDeviceStateActually(bool state, bool powerOn) {
         return;
     }
 
-    if (state) {
-        Serial.println("Turning on white noise and light...");
-        remoteCharacteristic->writeValue(TURN_ON);
-    } else {
-        Serial.println("Turning off noise and light...");
-        remoteCharacteristic->writeValue(TURN_OFF);
-    }
+    Serial.printf("Sending command %s\r\n", command.c_str());
+    remoteCharacteristic->writeValue(command);
 
     if (powerOn) {
         Serial.println("Turning power on");
@@ -126,17 +121,22 @@ void mqttPublishState() {
     }
 }
 
-void setDeviceState(bool state) {
-    Serial.printf("Will set state to %s\r\n", state ? "ON" : "OFF");
+void setDeviceState(const std::string& command) {
+    Serial.printf("Will send command %s\r\n", command.c_str());
     changeDeviceState = true;
-    newDeviceState = state;
+    newDeviceState = command;
 }
 
 void mqttMessageReceivedCallback(char* topic, char* message) {
     if (strcmp(message, "ON") == 0) {
-        setDeviceState(true);
+        Serial.println("Turning white noise and red light on");
+        setDeviceState(TURN_ON);
     } else if (strcmp(message, "OFF") == 0) {
-        setDeviceState(false);
+        Serial.println("Turning sound and light off");
+        setDeviceState(TURN_OFF);
+    } else if (strncmp(message, "SP", 2) == 0 || strncmp(message, "SI", 2) == 0) {
+        std::string command = message;
+        setDeviceState(command);
     } else {
         Serial.println("Invalid MQTT command");
     }
@@ -153,7 +153,8 @@ void doSetup() {
 
 void doLoop(unsigned long currentMillis) {
     if (changeDeviceState) {
-        setDeviceStateActually(newDeviceState, false);
+        setDeviceStateActually(false, newDeviceState);
         changeDeviceState = false;
+        newDeviceState = "";
     }
 }
