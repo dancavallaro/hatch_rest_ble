@@ -18,13 +18,6 @@ static std::string TURN_ON = "SP02";
 // Turn the power on
 static std::string POWER_ON = "SI01";
 
-unsigned int lastButtonState = 1;
-unsigned long buttonPressStartTime = 0;
-// A short press must be shorter than this threshold and turns the device on.
-const unsigned int shortPressMillis = 1000;
-// A long hold must be longer than this threshold and turns the device off.
-const unsigned int longHoldMillis = 2000;
-
 unsigned int lastMqttStateUpdateMillis = 0;
 const unsigned int stateUpdateIntervalMillis = 60 * 1000;
 
@@ -34,7 +27,6 @@ bool newDeviceState = false;
 static NimBLEClient* client = nullptr;
 
 const char *MQTT_CONTROL_TOPIC = "nursery/hatch";
-const char *MQTT_STATE_TOPIC = "nursery/hatch/state";
 
 BLERemoteCharacteristic* getCharacteristic(BLEUUID service, BLEUUID characteristic) {
     BLERemoteService* remoteService = client->getService(service);
@@ -85,11 +77,6 @@ void disconnectFromHatch() {
     client->disconnect();
 }
 
-void mqttPublishState(bool state) {
-    const char *stateStr = state ? "ON" : "OFF";
-    mqttClient()->publish(MQTT_STATE_TOPIC, stateStr);
-}
-
 bool decodePowerState(const char* feedback) {
     while (*feedback) {
         if (*feedback == 0x54) {
@@ -129,7 +116,6 @@ void setDeviceStateActually(bool state, bool powerOn) {
     }
 
     disconnectFromHatch();
-    mqttPublishState(state);
 }
 
 void mqttPublishState() {
@@ -138,25 +124,6 @@ void mqttPublishState() {
     } else {
         return;
     }
-
-//    connectToHatch();
-//
-//    BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(feedbackServiceUUID, feedbackCharUUID);
-//    if (remoteCharacteristic == nullptr) {
-//        Serial.println("Couldn't connect to Hatch!");
-//        return;
-//    }
-//
-//    const char* feedback = remoteCharacteristic->readValue().c_str();
-//    bool powerState = decodePowerState(feedback);
-//    Serial.printf("Hatch is currently %s\r\n", powerState ? "ON" : "OFF");
-//    disconnectFromHatch();
-//    if (!powerState) {
-//        Serial.println("Turning power on");
-//        // Turn the power on, but keep it in "off" mode.
-//        setDeviceStateActually(false, true);
-//    }
-//    mqttPublishState(powerState);
 }
 
 void setDeviceState(bool state) {
@@ -181,38 +148,10 @@ void mqttPostConnectCallback(PubSubClient* client) {
 }
 
 void doSetup() {
-    pinMode(BUTTON_BUILTIN, INPUT);
-
     BLEDevice::init("HatchRestClient");
 }
 
 void doLoop(unsigned long currentMillis) {
-    unsigned int buttonState = digitalRead(BUTTON_BUILTIN);
-
-    if (buttonState != lastButtonState) {
-        lastButtonState = buttonState;
-
-        if (buttonState == 0) {
-            // The button is active low, so this is the beginning of a press/hold.
-            buttonPressStartTime = currentMillis;
-        } else if (buttonState == 1) {
-            // If the button was released within the threshold, turn on the device.
-            if (currentMillis - buttonPressStartTime < shortPressMillis) {
-                setDeviceState(true);
-            }
-
-            // Reset the button press timer when the button is released.
-            buttonPressStartTime = 0;
-        }
-    }
-
-    if (buttonPressStartTime != 0 && currentMillis - buttonPressStartTime > longHoldMillis) {
-        // Once the button has been held longer than the threshold, turn off the device.
-        setDeviceState(false);
-        // Consider the button press over once it's triggered a long hold.
-        buttonPressStartTime = 0;
-    }
-
     if (changeDeviceState) {
         setDeviceStateActually(newDeviceState, false);
         changeDeviceState = false;
