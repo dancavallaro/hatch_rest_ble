@@ -2,8 +2,6 @@
 #include <NimBLEDevice.h>
 #include <common.h>
 
-#define BUTTON_BUILTIN 39
-
 // Identifiers for connecting to the Hatch over BLE
 static BLEAddress deviceAddress("ef:d8:7b:5c:59:92", 1);
 static BLEUUID serviceUUID("02240001-5efd-47eb-9c1a-de53f7a2b232");
@@ -22,6 +20,7 @@ unsigned int lastMqttStateUpdateMillis = 0;
 const unsigned int stateUpdateIntervalMillis = 60 * 1000;
 
 bool changeDeviceState = false;
+bool shouldGetFeedback = false;
 std::string newDeviceState;
 
 static NimBLEClient* client = nullptr;
@@ -93,6 +92,20 @@ bool decodePowerState(const char* feedback) {
     return false;
 }
 
+void getFeedback() {
+    connectToHatch();
+    BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(feedbackServiceUUID, feedbackCharUUID);
+    if (remoteCharacteristic == nullptr) {
+        Serial.println("Couldn't connect to Hatch!");
+        return;
+    }
+    const char* feedback = remoteCharacteristic->readValue().c_str();
+    disconnectFromHatch();
+
+    bool powerState = decodePowerState(feedback);
+    Serial.printf("Hatch is currently %s (feedback: %s)\r\n", powerState ? "ON" : "OFF", feedback);
+}
+
 void setDeviceStateActually(bool powerOn, const std::string& command) {
     connectToHatch();
 
@@ -137,6 +150,8 @@ void mqttMessageReceivedCallback(char* topic, char* message) {
     } else if (strncmp(message, "SP", 2) == 0 || strncmp(message, "SI", 2) == 0) {
         std::string command = message;
         setDeviceState(command);
+    } else if (strcmp(message, "feedback") == 0) {
+        shouldGetFeedback = true;
     } else {
         Serial.println("Invalid MQTT command");
     }
@@ -156,5 +171,10 @@ void doLoop(unsigned long currentMillis) {
         setDeviceStateActually(false, newDeviceState);
         changeDeviceState = false;
         newDeviceState = "";
+    }
+
+    if (shouldGetFeedback) {
+        getFeedback();
+        shouldGetFeedback = false;
     }
 }
