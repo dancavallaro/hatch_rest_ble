@@ -108,40 +108,36 @@ void displayFeedback(const char* feedback, char* output) {
     output[30] = '\0';
 }
 
-void getFeedback() {
-    connectToHatch();
+bool getFeedback() {
     BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(feedbackServiceUUID, feedbackCharUUID);
     if (remoteCharacteristic == nullptr) {
         Serial.println("Couldn't connect to Hatch!");
-        return;
+        return false;
     }
     const char* feedback = remoteCharacteristic->readValue().c_str();
-    disconnectFromHatch();
 
     bool powerState = decodePowerState(feedback);
     char feedbackStr[31];
     displayFeedback(feedback, feedbackStr);
     Serial.printf("Hatch is currently %s (feedback: %s)\r\n", powerState ? "ON" : "OFF", feedbackStr);
+
+    return powerState;
 }
 
-void setDeviceStateActually(bool powerOn, const std::string& command) {
-    connectToHatch();
-
+void setDeviceStateActually(const std::string& command) {
     BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(serviceUUID, charUUID);
     if (remoteCharacteristic == nullptr) {
         Serial.println("Couldn't connect to Hatch!");
         return;
     }
 
-    Serial.printf("Sending command %s\r\n", command.c_str());
-    remoteCharacteristic->writeValue(command);
-
-    if (powerOn) {
-        Serial.println("Turning power on");
-        remoteCharacteristic->writeValue(POWER_ON);
+    if (command == POWER_ON && getFeedback()) {
+        Serial.println("Hatch is already on, won't send power on command");
+        return;
     }
 
-    disconnectFromHatch();
+    Serial.printf("Sending command %s\r\n", command.c_str());
+    remoteCharacteristic->writeValue(command);
 }
 
 void mqttPublishState() {
@@ -185,8 +181,12 @@ void doSetup() {
 }
 
 void doLoop(unsigned long currentMillis) {
+    if (changeDeviceState || shouldGetFeedback) {
+        connectToHatch();
+    }
+
     if (changeDeviceState) {
-        setDeviceStateActually(false, newDeviceState);
+        setDeviceStateActually(newDeviceState);
         changeDeviceState = false;
         newDeviceState = "";
     }
@@ -194,5 +194,9 @@ void doLoop(unsigned long currentMillis) {
     if (shouldGetFeedback) {
         getFeedback();
         shouldGetFeedback = false;
+    }
+
+    if (changeDeviceState || shouldGetFeedback) {
+        disconnectFromHatch();
     }
 }
