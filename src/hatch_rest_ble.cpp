@@ -142,7 +142,7 @@ bool getFeedback(bool verbose) {
 
     char feedbackStr[31];
     getHexString(rawFeedback, feedbackStr);
-    Serial.printf("Hatch is currently %s, (feedback: %s)\n",
+    Serial.printf("Hatch is currently %s (feedback: %s)\n",
                   feedback.power ? "ON" : "OFF", feedbackStr);
 
     if (verbose) {
@@ -214,8 +214,10 @@ void doSetup() {
 }
 
 void doLoop(unsigned long currentMillis) {
+    bool connected = false;
     if (changeDeviceState || shouldGetFeedback) {
         connectToHatch();
+        connected = true;
     }
 
     if (changeDeviceState) {
@@ -229,7 +231,7 @@ void doLoop(unsigned long currentMillis) {
         shouldGetFeedback = false;
     }
 
-    if (changeDeviceState || shouldGetFeedback) {
+    if (connected) {
         disconnectFromHatch();
     }
 }
