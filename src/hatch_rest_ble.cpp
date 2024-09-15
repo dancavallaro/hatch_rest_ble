@@ -142,14 +142,14 @@ bool getFeedback(bool verbose) {
 
     char feedbackStr[31];
     getHexString(rawFeedback, feedbackStr);
-    Serial.printf("Hatch is currently %s, (feedback: %s)\r\n",
+    Serial.printf("Hatch is currently %s, (feedback: %s)\n",
                   feedback.power ? "ON" : "OFF", feedbackStr);
 
     if (verbose) {
-        Serial.printf("Current time is: %s\r\n", std::to_string(feedback.time).c_str());
-        Serial.printf("Color: red=%d, green=%d, blue=%d, brightness=%d%%\r\n",
+        Serial.printf("Current time is: %s\n", std::to_string(feedback.time).c_str());
+        Serial.printf("Color: red=%d, green=%d, blue=%d, brightness=%d%%\n",
                       feedback.color.r, feedback.color.g, feedback.color.b, feedback.color.brightness);
-        Serial.printf("Audio: track=%d, volume=%d%%\r\n", feedback.audio.track, feedback.audio.volume);
+        Serial.printf("Audio: track=%d, volume=%d%%\n", feedback.audio.track, feedback.audio.volume);
     }
 
     return feedback.power;
@@ -167,7 +167,7 @@ void setDeviceStateActually(const std::string& command) {
         return;
     }
 
-    Serial.printf("Sending command %s\r\n", command.c_str());
+    Serial.printf("Sending command %s\n", command.c_str());
     remoteCharacteristic->writeValue(command);
 }
 
@@ -180,7 +180,7 @@ void mqttPublishState() {
 }
 
 void setDeviceState(const std::string& command) {
-    Serial.printf("Will send command %s\r\n", command.c_str());
+    Serial.printf("Will send command %s\n", command.c_str());
     changeDeviceState = true;
     newDeviceState = command;
 }
@@ -206,7 +206,7 @@ void mqttMessageReceivedCallback(char* topic, char* message) {
 
 void mqttPostConnectCallback(PubSubClient* client) {
     client->subscribe(MQTT_CONTROL_TOPIC);
-    Serial.printf("Connected to broker and subscribed to topic %s\r\n", MQTT_CONTROL_TOPIC);
+    Serial.printf("Connected to broker and subscribed to topic %s\n", MQTT_CONTROL_TOPIC);
 }
 
 void doSetup() {
