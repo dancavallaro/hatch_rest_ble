@@ -57,6 +57,10 @@ void connectToHatch() {
     for (;;) {
         if (!client->connect(deviceAddress)) {
             Serial.println("Failed to connect to device!");
+            // Sometimes it seems to get stuck in an infinite loop here where the client
+            // will never connect. Constructing a new client seems to fix it.
+            BLEDevice::deleteClient(client);
+            client = BLEDevice::createClient();
         } else if (!client->isConnected()) {
             Serial.println("Connection appeared to be successful but now we're disconnected");
         } else {
@@ -65,7 +69,7 @@ void connectToHatch() {
         }
 
         // If we failed to connect or disconnected, just keep trying after a short delay.
-        delay(10);
+        delay(1000);
     }
 
     Serial.println("Ready to control device!");
