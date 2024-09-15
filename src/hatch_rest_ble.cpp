@@ -34,7 +34,6 @@ BLERemoteCharacteristic* getCharacteristic(BLEUUID service, BLEUUID characterist
         client->disconnect();
         return nullptr;
     }
-    Serial.println(" - Found our service");
 
     BLERemoteCharacteristic* remoteCharacteristic = remoteService->getCharacteristic(characteristic);
     if (remoteCharacteristic == nullptr) {
@@ -42,7 +41,6 @@ BLERemoteCharacteristic* getCharacteristic(BLEUUID service, BLEUUID characterist
         client->disconnect();
         return nullptr;
     }
-    Serial.println(" - Found our characteristic");
 
     return remoteCharacteristic;
 }
@@ -71,8 +69,6 @@ void connectToHatch() {
         // If we failed to connect or disconnected, just keep trying after a short delay.
         delay(1000);
     }
-
-    Serial.println("Ready to control device!");
 }
 
 void disconnectFromHatch() {
