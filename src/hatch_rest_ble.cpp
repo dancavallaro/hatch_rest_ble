@@ -192,7 +192,9 @@ void mqttMessageReceivedCallback(char* topic, char* message) {
     } else if (strcmp(message, "OFF") == 0) {
         Serial.println("Turning sound and light off");
         setDeviceState(TURN_OFF);
-    } else if (strncmp(message, "SP", 2) == 0 || strncmp(message, "SI", 2) == 0) {
+    } else if (message[0] == 'S' && (message[1] == 'I' || message[1] == 'C' ||
+            message[1] == 'N' || message[1] == 'V' || message[1] == 'P')) {
+        // SI = power, SC = color, SN = track, SV = volume, SP = favorite
         std::string command = message;
         setDeviceState(command);
     } else if (strcmp(message, "feedback") == 0) {
