@@ -80,20 +80,43 @@ void disconnectFromHatch() {
     client->disconnect();
 }
 
-bool decodePowerState(const char* feedback) {
-    while (*feedback) {
-        if (*feedback == 0x54) {
-            feedback += 5;
-        } else if (*feedback == 0x43) {
-            feedback += 5;
-        } else if (*feedback == 0x53) {
-            feedback += 3;
-        } else if (*feedback == 0x50) {
-            char data = *(feedback + 1);
-            return (data != 0) && (data & 0xc0) == 0;
-        }
-    }
-    return false;
+struct HatchFeedback {
+    time_t time;
+    struct {
+        int r, g, b, brightness;
+    } color;
+    struct {
+        int track, volume;
+    } audio;
+    bool power;
+};
+
+int percent(int num) {
+    return round(100 * num / 255);
+}
+
+HatchFeedback decodeFeedback(const uint8_t *p) {
+    HatchFeedback feedback{};
+
+    // Time is preceded by 0x54
+    time_t time = (p[1] << 24) | (p[2] << 16) | (p[3] << 8) | p[4];
+    feedback.time = time;
+
+    // Color is preceded by 0x43
+    feedback.color.r = p[6];
+    feedback.color.g = p[7];
+    feedback.color.b = p[8];
+    feedback.color.brightness = percent(p[9]);
+
+    // Audio is preceded by 0x53
+    feedback.audio.track = p[11];
+    feedback.audio.volume = percent(p[12]);
+
+    // Power is preceded by 0x50
+    uint8_t powerData = p[14];
+    feedback.power = (powerData != 0) && (powerData & 0xc0) == 0;
+
+    return feedback;
 }
 
 char hexChars[] = {
@@ -103,29 +126,37 @@ char hexChars[] = {
         'C', 'D', 'E', 'F'
 };
 
-void displayFeedback(const char* feedback, char* output) {
+void getHexString(const uint8_t* feedback, char* output) {
     for (int i = 0; i < 15; i++) {
-        int val = (unsigned char)feedback[i];
+        int val = feedback[i];
         output[2*i] = hexChars[val/16];
         output[2*i+1] = hexChars[val%16];
     }
     output[30] = '\0';
 }
 
-bool getFeedback() {
+bool getFeedback(bool verbose) {
     BLERemoteCharacteristic* remoteCharacteristic = getCharacteristic(feedbackServiceUUID, feedbackCharUUID);
     if (remoteCharacteristic == nullptr) {
         Serial.println("Couldn't connect to Hatch!");
         return false;
     }
-    const char* feedback = remoteCharacteristic->readValue().c_str();
+    const uint8_t* rawFeedback = remoteCharacteristic->readValue().data();
+    HatchFeedback feedback = decodeFeedback(rawFeedback);
 
-    bool powerState = decodePowerState(feedback);
     char feedbackStr[31];
-    displayFeedback(feedback, feedbackStr);
-    Serial.printf("Hatch is currently %s (feedback: %s)\r\n", powerState ? "ON" : "OFF", feedbackStr);
+    getHexString(rawFeedback, feedbackStr);
+    Serial.printf("Hatch is currently %s, (feedback: %s)\r\n",
+                  feedback.power ? "ON" : "OFF", feedbackStr);
 
-    return powerState;
+    if (verbose) {
+        Serial.printf("Current time is: %s\r\n", std::to_string(feedback.time).c_str());
+        Serial.printf("Color: red=%d, green=%d, blue=%d, brightness=%d%%\r\n",
+                      feedback.color.r, feedback.color.g, feedback.color.b, feedback.color.brightness);
+        Serial.printf("Audio: track=%d, volume=%d%%\r\n", feedback.audio.track, feedback.audio.volume);
+    }
+
+    return feedback.power;
 }
 
 void setDeviceStateActually(const std::string& command) {
@@ -135,7 +166,7 @@ void setDeviceStateActually(const std::string& command) {
         return;
     }
 
-    if (command == POWER_ON && getFeedback()) {
+    if (command == POWER_ON && getFeedback(false)) {
         Serial.println("Hatch is already on, won't send power on command");
         return;
     }
@@ -196,7 +227,7 @@ void doLoop(unsigned long currentMillis) {
     }
 
     if (shouldGetFeedback) {
-        getFeedback();
+        getFeedback(true);
         shouldGetFeedback = false;
     }
 
