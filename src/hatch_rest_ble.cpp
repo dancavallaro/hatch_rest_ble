@@ -185,7 +185,7 @@ void setDeviceState(const std::string& command) {
     newDeviceState = command;
 }
 
-void mqttMessageReceivedCallback(char* topic, char* message) {
+void mqttMessageReceivedCallback(const char* topic, const char* message) {
     if (strcmp(message, "ON") == 0) {
         Serial.println("Turning white noise and red light on");
         setDeviceState(TURN_ON);
