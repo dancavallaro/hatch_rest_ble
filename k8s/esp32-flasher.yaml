@@ -1,0 +1,33 @@
+# One-off pod for flashing the ESP32 over USB on the Talos node.
+# Usage: see the flashing recipe below. Delete this pod when done.
+#   kubectl scale statefulset/serial-logger -n serial-logger --replicas=0
+#   kubectl apply -f esp32-flasher.yaml
+#   kubectl wait --for=condition=Ready pod/esp32-flasher -n serial-logger --timeout=120s
+#   kubectl exec -n serial-logger esp32-flasher -- pip install --quiet esptool
+#   kubectl cp .pio/build/nodemcu-32s/hatch-merged.bin serial-logger/esp32-flasher:/tmp/fw.bin
+#   kubectl exec -n serial-logger esp32-flasher -- \
+#     python -m esptool --chip esp32 --port /dev/ttyUSB0 --baud 460800 write_flash -z 0x0 /tmp/fw.bin
+#   kubectl delete pod esp32-flasher -n serial-logger
+#   kubectl scale statefulset/serial-logger -n serial-logger --replicas=1
+apiVersion: v1
+kind: Pod
+metadata:
+  name: esp32-flasher
+  namespace: serial-logger
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    hardware: esp32
+  containers:
+    - name: flasher
+      image: python:3.12-slim
+      securityContext:
+        privileged: true
+      command: ["sleep", "infinity"]
+      volumeMounts:
+        - mountPath: /dev/ttyUSB0
+          name: esp32-usb
+  volumes:
+    - name: esp32-usb
+      hostPath:
+        path: /dev/ttyUSB0
